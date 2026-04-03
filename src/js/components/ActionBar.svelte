@@ -34,8 +34,8 @@
 <style>
   .action-bar {
     display: flex;
-    gap: 4px;
-    padding: 6px 12px;
+    gap: 3px;
+    padding: 5px 10px;
     background: #1e1e1e;
     border-top: 1px solid #333;
     flex-wrap: wrap;
@@ -47,11 +47,16 @@
     background: #2a2a2a;
     border: 1px solid #444;
     border-radius: 4px;
-    color: #ccc;
-    padding: 4px 8px;
+    color: #d1d1d1;
+    padding: 4px 7px;
     font-size: 11px;
+    line-height: 1;
     cursor: pointer;
     white-space: nowrap;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease;
   }
   .action-btn:hover:not(:disabled) {
     background: #333;
@@ -66,9 +71,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
+    width: 13px;
+    height: 13px;
     flex: none;
+    color: #f3f3f3;
   }
   .action-label {
     font-size: 11px;
