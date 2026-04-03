@@ -1,4 +1,6 @@
 import { fs, path } from "./cep/node";
+import type { ScriptValidationResult } from "./knowledge/validator";
+import { validateScript } from "./knowledge/validator";
 import { csi, evalTS } from "./utils/bolt";
 import { findGitRoot } from "./providers/shared";
 
@@ -18,6 +20,7 @@ export interface ParsedAiActionResponse {
   scriptContent?: string;
   runImmediately: boolean;
   multipleBlocks?: boolean;
+  validation?: ScriptValidationResult;
 }
 
 function resolveRepoRoot(projectRoot?: string): string | null {
@@ -94,6 +97,7 @@ export function parseAiActionResponse(content: string): ParsedAiActionResponse {
   const first = matches[0];
   const runImmediately = (first[1] || "").toLowerCase() === "true";
   const scriptContent = first[2].trim();
+  const validation = scriptContent ? validateScript(scriptContent) : undefined;
 
   // Remove all ai-action blocks from the display text
   const displayText = content
@@ -105,6 +109,7 @@ export function parseAiActionResponse(content: string): ParsedAiActionResponse {
     scriptContent: scriptContent || undefined,
     runImmediately,
     multipleBlocks: matches.length > 1,
+    validation,
   };
 }
 

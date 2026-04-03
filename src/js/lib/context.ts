@@ -1,4 +1,5 @@
 import { evalTS } from "../lib/utils/bolt";
+import { getKnowledgeContext } from "./knowledge/index";
 
 interface ProjectInfo {
   projectName: string;
@@ -23,7 +24,7 @@ export interface ChatContext {
   projectRoot?: string;
 }
 
-export async function buildContext(): Promise<ChatContext> {
+export async function buildContext(userMessage?: string): Promise<ChatContext> {
   let projectInfo: ProjectInfo | null = null;
   let compInfo: CompInfo | null = null;
   let analysisSummary = "";
@@ -109,6 +110,9 @@ export async function buildContext(): Promise<ChatContext> {
     lines.push("");
     lines.push(analysisSummary);
   }
+
+  lines.push("");
+  lines.push(getKnowledgeContext(userMessage));
 
   lines.push("");
   lines.push("## AI Action Protocol");

@@ -14,6 +14,7 @@
   import ChatInput from "../components/ChatInput.svelte";
   import ActionBar from "../components/ActionBar.svelte";
   import StatusBar from "../components/StatusBar.svelte";
+  import type { ScriptValidationWarning } from "../lib/knowledge/validator";
   import type {
     ChatMessage,
     ProviderDefinition,
@@ -30,6 +31,7 @@
   let pendingScreenshot: { path: string; fileName: string } | null = $state(null);
   let sessionProjectRoot: string | undefined = $state();
   let didInitializeAiAction: boolean = $state(false);
+  let aiActionWarnings: ScriptValidationWarning[] = $state([]);
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
   let statusClearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -106,6 +108,10 @@
     }
   }
 
+  function setAiActionWarnings(warnings: ScriptValidationWarning[]) {
+    aiActionWarnings = warnings;
+  }
+
   function handleCancel() {
     setStatus({
       phase: "cancelled",
@@ -122,6 +128,7 @@
     messages = [];
     lastError = "";
     pendingScreenshot = null;
+    setAiActionWarnings([]);
     setStatus(null);
     addMessage(
       "system",
@@ -141,6 +148,7 @@
   async function handleSend(text: string) {
     if (!activeProvider) return;
 
+    setAiActionWarnings([]);
     const history = messages.slice();
     addMessage("user", text);
     isLoading = true;
@@ -159,7 +167,7 @@
         phase: "preparing",
         text: "Reading AE context...",
       });
-      const context = await buildContext();
+      const context = await buildContext(text);
       sessionProjectRoot = context.projectRoot || sessionProjectRoot;
 
       if (!didInitializeAiAction && sessionProjectRoot) {
@@ -223,6 +231,9 @@
         }
 
         if (parsed.scriptContent) {
+          const warnings = parsed.validation?.warnings || [];
+          setAiActionWarnings(warnings);
+
           setStatus({
             phase: "saving_action",
             text: "Saving AI Action...",
@@ -230,28 +241,47 @@
           const saved = saveAiAction(context.projectRoot, parsed.scriptContent, displayText);
           addMessage("system", "AI Action ready: " + saved.summary);
 
+          if (warnings.length > 0) {
+            addMessage(
+              "system",
+              warnings.map((warning) => warning.message).join("\n")
+            );
+          }
+
           if (parsed.runImmediately) {
-            setStatus({
-              phase: "running_action",
-              text: "Running AI Action...",
-            });
-            const runResult = await runAiAction(context.projectRoot);
-            if (runResult && "error" in runResult && runResult.error) {
-              setStatus({
-                phase: "error",
-                text: "AI Action failed.",
-                raw: String(runResult.error),
-                terminal: true,
-              });
-              addMessage("system", "AI Action failed: " + runResult.error);
-              lastError = String(runResult.error);
-            } else {
+            if (warnings.length > 0) {
               setStatus({
                 phase: "completed",
-                text: "AI Action executed successfully.",
+                text: "AI Action saved with validation warnings.",
                 terminal: true,
               });
-              addMessage("system", "AI Action executed successfully.");
+              addMessage(
+                "system",
+                "AI Action was not run automatically. Review the warnings, click AI Action to run anyway, or ask the assistant to fix the script."
+              );
+            } else {
+              setStatus({
+                phase: "running_action",
+                text: "Running AI Action...",
+              });
+              const runResult = await runAiAction(context.projectRoot);
+              if (runResult && "error" in runResult && runResult.error) {
+                setStatus({
+                  phase: "error",
+                  text: "AI Action failed.",
+                  raw: String(runResult.error),
+                  terminal: true,
+                });
+                addMessage("system", "AI Action failed: " + runResult.error);
+                lastError = String(runResult.error);
+              } else {
+                setStatus({
+                  phase: "completed",
+                  text: "AI Action executed successfully.",
+                  terminal: true,
+                });
+                addMessage("system", "AI Action executed successfully.");
+              }
             }
           } else {
             setStatus({
@@ -361,6 +391,10 @@
           sessionProjectRoot = context.projectRoot || sessionProjectRoot;
         }
 
+        if (aiActionWarnings.length > 0) {
+          addMessage("system", "Running AI Action despite validation warnings.");
+        }
+
         const runResult = await runAiAction(sessionProjectRoot);
         if (runResult && "error" in runResult && runResult.error) {
           addMessage("system", "AI Action failed: " + runResult.error);
@@ -438,6 +472,27 @@
         <button class="pending-screenshot__clear" onclick={() => (pendingScreenshot = null)}>
           Clear
         </button>
+      </div>
+    {/if}
+
+    {#if aiActionWarnings.length > 0}
+      <div class="validation-banner">
+        <div class="validation-banner__title">AI Action validation warnings</div>
+        <ul class="validation-banner__list">
+          {#each aiActionWarnings as warning}
+            <li>
+              <span>{warning.message}</span>
+              <span class="validation-banner__meta">
+                {warning.occurrences
+                  .map((occurrence) => `L${occurrence.line}:C${occurrence.column}`)
+                  .join(", ")}
+              </span>
+            </li>
+          {/each}
+        </ul>
+        <div class="validation-banner__hint">
+          Click AI Action to run anyway, or ask the assistant to revise the script.
+        </div>
       </div>
     {/if}
 
@@ -549,5 +604,38 @@
   }
   .pending-screenshot__clear:hover {
     color: #eee;
+  }
+  .validation-banner {
+    margin: 8px 12px 0;
+    padding: 10px 12px;
+    border: 1px solid #8a5a1d;
+    border-radius: 6px;
+    background: #2b2114;
+    color: #f2d3a2;
+  }
+  .validation-banner__title {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .validation-banner__list {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .validation-banner__list li {
+    margin: 0 0 6px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .validation-banner__meta {
+    color: #c6a46c;
+    margin-left: 6px;
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 11px;
+  }
+  .validation-banner__hint {
+    font-size: 11px;
+    color: #d8ba86;
+    margin-top: 6px;
   }
 </style>
