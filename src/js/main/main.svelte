@@ -43,6 +43,23 @@
   let statusElapsedMs: number = $state(0);
   const STATUS_CLEAR_DELAY_MS = 2000;
 
+  function getProviderHeaderTitle(provider: ProviderDefinition | null): string {
+    if (!provider) return "AE AI Chat";
+
+    switch (provider.id) {
+      case "claude":
+        return "Claude";
+      case "claude-api":
+        return "Claude API";
+      case "codex":
+        return "Codex";
+      default:
+        return provider.displayName;
+    }
+  }
+
+  const activeHeaderTitle = $derived.by(() => getProviderHeaderTitle(activeProvider));
+
   function cancelStatusClear() {
     if (statusClearTimer) {
       clearTimeout(statusClearTimer);
@@ -133,6 +150,7 @@
   function handleProviderSelect(provider: ProviderDefinition) {
     activeProvider = provider;
     model = provider.models[0]?.value || "";
+    localStorage.setItem("selectedProviderId", provider.id);
     sessionId = undefined;
     messages = [];
     rememberError("");
@@ -141,9 +159,7 @@
     setStatus(null);
     addMessage(
       "system",
-      "AE AI Chat ready. Ask " +
-        provider.displayName +
-        " about your After Effects project."
+      provider.displayName + " ready. Ask about your After Effects project."
     );
   }
 
@@ -444,6 +460,18 @@
   onMount(() => {
     let disposed = false;
 
+    const lastProviderId = localStorage.getItem("selectedProviderId");
+    if (lastProviderId) {
+      const provider = providerRegistry.find((p) => p.id === lastProviderId);
+      if (provider) {
+        provider.isAvailable().then((availability) => {
+          if (availability.available && !disposed) {
+            handleProviderSelect(provider);
+          }
+        });
+      }
+    }
+
     buildContext()
       .then((context) => {
         if (disposed) return;
@@ -471,7 +499,7 @@
 {:else}
   <div class="app">
     <header class="header">
-      <span class="header__title">AE AI Chat</span>
+      <span class="header__title">{activeHeaderTitle}</span>
       <div class="header__controls">
         <select class="model-select" bind:value={model}>
           {#each activeProvider.models as providerModel}
