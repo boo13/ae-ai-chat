@@ -15,6 +15,33 @@ import type {
 let cachedCodexPath: string | null = null;
 const CODEX_TIMEOUT_MS = 600000;
 const CODEX_STALL_MS = 15000;
+const MAX_STDOUT_PARSE_FAILURES = 5;
+
+interface CodexLaunchDiagnostics {
+  codexPath: string;
+  cwd: string;
+  gitRoot: string | null;
+  skipGitRepoCheck: boolean;
+  model: string;
+  sessionMode: "exec" | "exec resume";
+  pathLookupOnly: boolean;
+  env: {
+    HOME: string;
+    PATH: string;
+    TMPDIR: string;
+    USER: string;
+  };
+}
+
+interface LaunchEnvironmentIssue {
+  message: string;
+  detail: string;
+}
+
+interface StructuredCodexError {
+  type: string;
+  message: string;
+}
 
 function shortenDetail(value: string, maxLength = 56): string {
   const compact = value.replace(/\s+/g, " ").trim();
@@ -47,6 +74,181 @@ function describeTool(item: any): string | null {
 
   if (parts.length === 0) return null;
   return shortenDetail(parts.join(" / "));
+}
+
+function buildLaunchDiagnostics(options: SendMessageOptions): CodexLaunchDiagnostics {
+  const codexPath = findCodexPath();
+  const env = getCleanEnv();
+  const gitRoot = findGitRoot(options.projectRoot);
+  const cwd = gitRoot || resolveWorkingDirectory(options.projectRoot) || os.homedir();
+
+  return {
+    codexPath,
+    cwd,
+    gitRoot: gitRoot || null,
+    skipGitRepoCheck: !gitRoot,
+    model: options.model,
+    sessionMode: options.sessionId ? "exec resume" : "exec",
+    pathLookupOnly: codexPath === "codex",
+    env: {
+      HOME: env.HOME || "",
+      PATH: env.PATH || "",
+      TMPDIR: env.TMPDIR || "",
+      USER: env.USER || "",
+    },
+  };
+}
+
+function formatLaunchDiagnostics(diagnostics: CodexLaunchDiagnostics): string {
+  return [
+    "Launch diagnostics:",
+    `- codexPath: ${diagnostics.codexPath}`,
+    `- cwd: ${diagnostics.cwd}`,
+    `- gitRoot: ${diagnostics.gitRoot || "(none)"}`,
+    `- skipGitRepoCheck: ${diagnostics.skipGitRepoCheck ? "yes" : "no"}`,
+    `- model: ${diagnostics.model}`,
+    `- sessionMode: ${diagnostics.sessionMode}`,
+    `- pathLookupOnly: ${diagnostics.pathLookupOnly ? "yes" : "no"}`,
+    "- env:",
+    `  HOME=${diagnostics.env.HOME || "(empty)"}`,
+    `  PATH=${diagnostics.env.PATH || "(empty)"}`,
+    `  TMPDIR=${diagnostics.env.TMPDIR || "(empty)"}`,
+    `  USER=${diagnostics.env.USER || "(empty)"}`,
+  ].join("\n");
+}
+
+function logLaunchDiagnostics(diagnostics: CodexLaunchDiagnostics) {
+  console.info("[AE AI Chat][Codex] Launch diagnostics\n" + formatLaunchDiagnostics(diagnostics));
+
+  if (diagnostics.pathLookupOnly) {
+    console.warn(
+      "[AE AI Chat][Codex] Using PATH lookup for the Codex binary. AE may not inherit the same PATH as your shell."
+    );
+  }
+}
+
+function checkLaunchEnvironment(diagnostics: CodexLaunchDiagnostics): LaunchEnvironmentIssue | null {
+  if (!fs) return null;
+
+  const homeDir = diagnostics.env.HOME;
+  if (!homeDir) {
+    return {
+      message:
+        "Codex launch environment is missing HOME. After Effects may not be inheriting your normal shell environment.",
+      detail: "HOME is empty.\n\n" + formatLaunchDiagnostics(diagnostics),
+    };
+  }
+
+  try {
+    fs.accessSync(homeDir);
+  } catch (error: any) {
+    return {
+      message:
+        "Codex cannot access HOME from the AE panel process. Codex auth/config may be unavailable in this environment.",
+      detail:
+        `HOME access failed for ${homeDir}: ${error?.message || String(error)}\n\n` +
+        formatLaunchDiagnostics(diagnostics),
+    };
+  }
+
+  const codexHome = path.join(homeDir, ".codex");
+  if (fs.existsSync(codexHome)) {
+    try {
+      fs.accessSync(codexHome);
+    } catch (error: any) {
+      return {
+        message:
+          "Codex cannot access ~/.codex from the AE panel process. This usually means auth or session files are not reachable from AE.",
+        detail:
+          `Access failed for ${codexHome}: ${error?.message || String(error)}\n\n` +
+          formatLaunchDiagnostics(diagnostics),
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatProcessFailureDetails(params: {
+  summary: string;
+  exitCode: number | null;
+  stderr: string;
+  invalidStdoutLines: string[];
+  trailingStdoutBuffer: string;
+  diagnostics: CodexLaunchDiagnostics;
+  partialOutput?: string;
+  spawnError?: string;
+  structuredError?: StructuredCodexError | null;
+}): string {
+  const sections = [
+    `Summary: ${params.summary}`,
+    `Exit code: ${params.exitCode === null ? "(none)" : params.exitCode}`,
+  ];
+
+  if (params.structuredError?.message) {
+    sections.push(`Codex ${params.structuredError.type}:\n${params.structuredError.message}`);
+  }
+
+  if (params.spawnError) {
+    sections.push(`Spawn error: ${params.spawnError}`);
+  }
+
+  if (params.stderr.trim()) {
+    sections.push("stderr:\n" + params.stderr.trim());
+  }
+
+  if (params.invalidStdoutLines.length > 0) {
+    sections.push(
+      "stdout lines that were not valid JSON:\n" + params.invalidStdoutLines.join("\n")
+    );
+  }
+
+  if (params.trailingStdoutBuffer.trim()) {
+    sections.push("trailing stdout buffer:\n" + params.trailingStdoutBuffer.trim());
+  }
+
+  if (params.partialOutput?.trim()) {
+    sections.push("partial agent output:\n" + params.partialOutput.trim());
+  }
+
+  sections.push(formatLaunchDiagnostics(params.diagnostics));
+  return sections.join("\n\n");
+}
+
+function formatErrorResult(message: string, details: string): string {
+  return `${message}\n\n${details}`;
+}
+
+function pushStdoutParseFailure(target: string[], line: string) {
+  if (!line.trim()) return;
+  if (target.length >= MAX_STDOUT_PARSE_FAILURES) return;
+  target.push(shortenDetail(line, 240));
+}
+
+function extractStructuredError(payload: any): StructuredCodexError | null {
+  if (!payload || typeof payload !== "object" || typeof payload.type !== "string") {
+    return null;
+  }
+
+  if (payload.type === "error" && typeof payload.message === "string" && payload.message.trim()) {
+    return {
+      type: payload.type,
+      message: payload.message.trim(),
+    };
+  }
+
+  if (
+    payload.type === "turn.failed" &&
+    typeof payload.error?.message === "string" &&
+    payload.error.message.trim()
+  ) {
+    return {
+      type: payload.type,
+      message: payload.error.message.trim(),
+    };
+  }
+
+  return null;
 }
 
 function statusFromCommandItem(item: any, eventType: string): ProviderStatusUpdate {
@@ -219,10 +421,6 @@ function getCleanEnv(): Record<string, string> {
   );
 }
 
-function shouldSkipGitRepoCheck(projectRoot?: string): boolean {
-  return !findGitRoot(projectRoot);
-}
-
 function hasResolvedCodexBinary(): boolean {
   const codexPath = findCodexPath();
   if (codexPath !== "codex") return true;
@@ -334,11 +532,31 @@ async function sendCodexMessage(
       ? options.systemContext + "\n\n" + prompt
       : prompt;
     const startTime = Date.now();
+    const diagnostics = buildLaunchDiagnostics(options);
+    logLaunchDiagnostics(diagnostics);
+
+    const environmentIssue = checkLaunchEnvironment(diagnostics);
+    if (environmentIssue) {
+      emitStatus({
+        phase: "error",
+        text: environmentIssue.message,
+        raw: environmentIssue.detail,
+        terminal: true,
+      });
+      resolve({
+        result: formatErrorResult(environmentIssue.message, environmentIssue.detail),
+        duration_ms: 0,
+        is_error: true,
+        sessionId: options.sessionId,
+      });
+      return;
+    }
+
     const args = options.sessionId
       ? ["exec", "resume", "--json", options.sessionId, "--model", options.model]
       : ["exec", "-", "--json", "--model", options.model];
 
-    if (shouldSkipGitRepoCheck(options.projectRoot)) {
+    if (diagnostics.skipGitRepoCheck) {
       args.push("--skip-git-repo-check");
     }
 
@@ -351,18 +569,19 @@ async function sendCodexMessage(
     }
 
     const proc = child_process.spawn(
-      findCodexPath(),
+      diagnostics.codexPath,
       args,
       {
-        cwd: resolveWorkingDirectory(options.projectRoot) || os.homedir(),
+        cwd: diagnostics.cwd,
         env: getCleanEnv(),
         stdio: ["pipe", "pipe", "pipe"],
       }
     );
 
-    let stdout = "";
     let stdoutBuffer = "";
     let stderr = "";
+    const invalidStdoutLines: string[] = [];
+    let structuredError: StructuredCodexError | null = null;
     let killed = false;
     let cancelled = false;
     let result = "";
@@ -400,7 +619,6 @@ async function sendCodexMessage(
 
     proc.stdout.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
-      stdout += text;
       stdoutBuffer += text;
       resetStallTimer.touch();
 
@@ -415,6 +633,11 @@ async function sendCodexMessage(
           const payload = JSON.parse(trimmed);
           if (payload?.type === "thread.started" && typeof payload.thread_id === "string") {
             sessionId = payload.thread_id;
+          }
+
+          const parsedError = extractStructuredError(payload);
+          if (parsedError) {
+            structuredError = parsedError;
           }
 
           const status = humanizeCodexEvent(payload);
@@ -433,7 +656,9 @@ async function sendCodexMessage(
               emittedAssistantText = true;
             }
           }
-        } catch {}
+        } catch {
+          pushStdoutParseFailure(invalidStdoutLines, trimmed);
+        }
       }
     });
 
@@ -488,6 +713,11 @@ async function sendCodexMessage(
             sessionId = payload.thread_id;
           }
 
+          const parsedError = extractStructuredError(payload);
+          if (parsedError) {
+            structuredError = parsedError;
+          }
+
           const status = humanizeCodexEvent(payload);
           if (status) {
             emitStatus(status);
@@ -504,24 +734,39 @@ async function sendCodexMessage(
               emittedAssistantText = true;
             }
           }
-        } catch {}
+        } catch {
+          pushStdoutParseFailure(invalidStdoutLines, trimmed);
+        }
       }
 
       if (code !== 0) {
-        const summary = summarizeProcessError(stderr, code);
+        const summary = structuredError?.message || summarizeProcessError(stderr, code);
+        const detail = formatProcessFailureDetails({
+          summary,
+          exitCode: code,
+          stderr,
+          invalidStdoutLines,
+          trailingStdoutBuffer: stdoutBuffer,
+          diagnostics,
+          partialOutput: result,
+          structuredError,
+        });
+        console.error("[AE AI Chat][Codex] Process exited with error\n" + detail);
         emitStatus({
           phase: "error",
-          text: "Codex exited with an error.",
-          raw: summary,
+          text: structuredError?.message
+            ? shortenDetail(structuredError.message, 96)
+            : "Codex exited with code " + code + ".",
+          raw: detail,
           terminal: true,
         });
         resolve({
-          result: result
-            ? "Error: Codex exited before completing the request.\n\nPartial output:\n" +
-              result +
-              "\n\n" +
-              summary
-            : "Error: " + summary,
+          result: formatErrorResult(
+            structuredError?.message
+              ? "Error: " + structuredError.message
+              : "Error: Codex exited with code " + code + ".",
+            detail
+          ),
           duration_ms,
           is_error: true,
           sessionId,
@@ -544,8 +789,34 @@ async function sendCodexMessage(
 
     proc.on("error", (err: Error) => {
       clearTimeout(timer);
+      resetStallTimer.clear();
+      const detail = formatProcessFailureDetails({
+        summary: "Failed to start Codex CLI.",
+        exitCode: null,
+        stderr,
+        invalidStdoutLines,
+        trailingStdoutBuffer: stdoutBuffer,
+        diagnostics,
+        spawnError: err.message,
+        structuredError,
+      });
+      console.error("[AE AI Chat][Codex] Failed to start process\n" + detail);
+      emitStatus({
+        phase: "error",
+        text:
+          diagnostics.pathLookupOnly && /not found|ENOENT/i.test(err.message)
+            ? "Codex CLI was not found from the AE panel process PATH."
+            : "Failed to start Codex CLI.",
+        raw: detail,
+        terminal: true,
+      });
       resolve({
-        result: "Failed to start Codex CLI: " + err.message,
+        result: formatErrorResult(
+          diagnostics.pathLookupOnly && /not found|ENOENT/i.test(err.message)
+            ? "Failed to start Codex CLI: AE could not resolve `codex` from its PATH."
+            : "Failed to start Codex CLI: " + err.message,
+          detail
+        ),
         duration_ms: Date.now() - startTime,
         is_error: true,
       });
@@ -566,8 +837,9 @@ export const codexProvider: ProviderDefinition = {
   displayName: "Codex",
   models: [
     { value: "gpt-5.4", label: "GPT-5.4" },
-    { value: "o3", label: "o3" },
-    { value: "o1", label: "o1" },
+    { value: "gpt-5.3-codex", label: "GPT-5.3 Codex" },
+    { value: "gpt-5.1-codex-max", label: "GPT-5.1 Codex Max" },
+    { value: "gpt-5.1-codex-mini", label: "GPT-5.1 Codex Mini" },
   ],
   supportsImages: true,
   async isAvailable() {

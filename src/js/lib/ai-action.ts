@@ -70,6 +70,172 @@ function buildScriptHeader(summary: string): string {
   ].join("\n");
 }
 
+function uniquePaths(values: Array<string | null | undefined>): string[] {
+  const seen: Record<string, true> = {};
+  const result: string[] = [];
+
+  for (const value of values) {
+    if (!value) continue;
+    const normalized = path.resolve(value);
+    if (seen[normalized]) continue;
+    seen[normalized] = true;
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function buildIncludeSearchRoots(projectRoot?: string): string[] {
+  const repoRoot = resolveRepoRoot(projectRoot);
+  const extensionRoot = (() => {
+    try {
+      return csi.getSystemPath("extension");
+    } catch {
+      return "";
+    }
+  })();
+
+  return uniquePaths([
+    projectRoot,
+    projectRoot ? path.join(projectRoot, "Scripts") : null,
+    projectRoot ? path.join(projectRoot, "Scripts", "recipes") : null,
+    repoRoot,
+    repoRoot ? path.join(repoRoot, "Scripts") : null,
+    repoRoot ? path.join(repoRoot, "Scripts", "recipes") : null,
+    extensionRoot,
+    extensionRoot ? path.join(extensionRoot, "Scripts") : null,
+  ]);
+}
+
+function buildIncludeSearchRootsForSource(
+  sourceFilePath: string,
+  projectRoot?: string
+): string[] {
+  const sourceDir = path.dirname(sourceFilePath);
+  return uniquePaths([
+    sourceDir,
+    path.join(sourceDir, ".."),
+    path.join(sourceDir, "..", "lib"),
+    ...buildIncludeSearchRoots(projectRoot),
+  ]);
+}
+
+function isAbsoluteIncludePath(includePath: string): boolean {
+  return (
+    /^(\/|[A-Za-z]:[\\/])/.test(includePath) ||
+    includePath.indexOf("file://") === 0
+  );
+}
+
+function rewriteIncludeDirectives(
+  scriptContent: string,
+  projectRoot?: string,
+  searchRoots?: string[]
+): { scriptContent: string; rewritten: string[]; unresolved: string[] } {
+  if (!fs) {
+    return { scriptContent, rewritten: [], unresolved: [] };
+  }
+
+  const roots = searchRoots && searchRoots.length > 0
+    ? uniquePaths(searchRoots)
+    : buildIncludeSearchRoots(projectRoot);
+  const rewritten: string[] = [];
+  const unresolved: string[] = [];
+
+  const nextScript = scriptContent.replace(
+    /^([ \t]*#include\s+")([^"\r\n]+)("[ \t]*)$/gm,
+    (fullMatch, prefix: string, includePath: string, suffix: string) => {
+      if (isAbsoluteIncludePath(includePath)) {
+        return fullMatch;
+      }
+
+      for (let i = 0; i < roots.length; i += 1) {
+        const candidate = path.resolve(roots[i], includePath);
+        if (!fs.existsSync(candidate)) continue;
+        rewritten.push(`${includePath} -> ${candidate}`);
+        return prefix + candidate + suffix;
+      }
+
+      unresolved.push(includePath);
+      return fullMatch;
+    }
+  );
+
+  return { scriptContent: nextScript, rewritten, unresolved };
+}
+
+function extractExternalScriptPath(scriptContent: string): string | null {
+  const patterns = [
+    /new\s+File\(\s*"([^"\r\n]+\.jsx(?:inc)?)"\s*\)/i,
+    /\$\.evalFile\(\s*"([^"\r\n]+\.jsx(?:inc)?)"\s*\)/i,
+  ];
+
+  for (let i = 0; i < patterns.length; i += 1) {
+    const match = scriptContent.match(patterns[i]);
+    if (!match || !match[1]) continue;
+    return match[1];
+  }
+
+  return null;
+}
+
+function expandExternalScriptReference(
+  scriptContent: string,
+  projectRoot?: string
+): {
+  scriptContent: string;
+  sourcePath?: string;
+  rewritten: string[];
+  unresolved: string[];
+} {
+  if (!fs) {
+    return { scriptContent, rewritten: [], unresolved: [] };
+  }
+
+  const externalPath = extractExternalScriptPath(scriptContent);
+  if (!externalPath || !path.isAbsolute(externalPath) || !fs.existsSync(externalPath)) {
+    return { scriptContent, rewritten: [], unresolved: [] };
+  }
+
+  try {
+    const externalSource = fs.readFileSync(externalPath, "utf8");
+    const includeRewrite = rewriteIncludeDirectives(
+      externalSource.trim(),
+      projectRoot,
+      buildIncludeSearchRootsForSource(externalPath, projectRoot)
+    );
+
+    return {
+      scriptContent: includeRewrite.scriptContent,
+      sourcePath: externalPath,
+      rewritten: includeRewrite.rewritten,
+      unresolved: includeRewrite.unresolved,
+    };
+  } catch {
+    return { scriptContent, rewritten: [], unresolved: [] };
+  }
+}
+
+function prepareRunnableScript(
+  scriptContent: string,
+  projectRoot?: string
+): {
+  scriptContent: string;
+  expandedSourcePath?: string;
+  rewritten: string[];
+  unresolved: string[];
+} {
+  const expanded = expandExternalScriptReference(scriptContent.trim(), projectRoot);
+  const includeRewrite = rewriteIncludeDirectives(expanded.scriptContent, projectRoot);
+
+  return {
+    scriptContent: includeRewrite.scriptContent,
+    expandedSourcePath: expanded.sourcePath,
+    rewritten: expanded.rewritten.concat(includeRewrite.rewritten),
+    unresolved: expanded.unresolved.concat(includeRewrite.unresolved),
+  };
+}
+
 function toSummary(displayText: string): string {
   const firstLine = displayText
     .split("\n")
@@ -229,14 +395,28 @@ export function saveAiAction(
   ensureActionDir(paths.actionDir);
 
   const summary = toSummary(displayText);
-  const scriptText = buildScriptHeader(summary) + scriptContent.trim() + "\n";
+  const prepared = prepareRunnableScript(scriptContent.trim(), projectRoot);
+  const scriptText = buildScriptHeader(summary) + prepared.scriptContent + "\n";
   const updatedAt = new Date().toISOString();
 
-  const preview = scriptContent.trim().substring(0, 500);
+  const preview = prepared.scriptContent.substring(0, 500);
   console.log(
-    "[AI Action] Writing script (" + scriptContent.trim().length + " chars):\n" +
-    preview + (scriptContent.trim().length > 500 ? "\n..." : "")
+    "[AI Action] Writing script (" + prepared.scriptContent.length + " chars):\n" +
+    preview + (prepared.scriptContent.length > 500 ? "\n..." : "")
   );
+  if (prepared.rewritten.length > 0) {
+    console.log(
+      "[AI Action] Rewrote #include directives:\n" + prepared.rewritten.join("\n")
+    );
+  }
+  if (prepared.expandedSourcePath) {
+    console.log("[AI Action] Expanded external script reference: " + prepared.expandedSourcePath);
+  }
+  if (prepared.unresolved.length > 0) {
+    console.warn(
+      "[AI Action] Unresolved #include directives:\n" + prepared.unresolved.join("\n")
+    );
+  }
 
   fs.writeFileSync(paths.scriptPath, scriptText, "utf8");
   fs.writeFileSync(
@@ -270,6 +450,37 @@ export async function runAiAction(projectRoot?: string) {
   const resolvedDir = path.resolve(paths.actionDir);
   if (!resolvedScript.startsWith(resolvedDir + path.sep)) {
     throw new Error("AI Action path is outside the session directory.");
+  }
+
+  if (fs.existsSync(paths.scriptPath)) {
+    try {
+      const currentScript = fs.readFileSync(paths.scriptPath, "utf8");
+      const prepared = prepareRunnableScript(currentScript, projectRoot);
+      const normalizedCurrent = currentScript.replace(/\r\n/g, "\n").trim();
+      const normalizedPrepared = prepared.scriptContent.replace(/\r\n/g, "\n").trim();
+
+      if (normalizedPrepared && normalizedPrepared !== normalizedCurrent) {
+        console.log("[AI Action] Refreshing stored runnable script before execution.");
+        if (prepared.expandedSourcePath) {
+          console.log(
+            "[AI Action] Expanded external script reference: " + prepared.expandedSourcePath
+          );
+        }
+        if (prepared.rewritten.length > 0) {
+          console.log(
+            "[AI Action] Rewrote #include directives:\n" + prepared.rewritten.join("\n")
+          );
+        }
+        if (prepared.unresolved.length > 0) {
+          console.warn(
+            "[AI Action] Unresolved #include directives:\n" + prepared.unresolved.join("\n")
+          );
+        }
+        fs.writeFileSync(paths.scriptPath, normalizedPrepared + "\n", "utf8");
+      }
+    } catch (err) {
+      console.warn("[AI Action] Failed to refresh runnable script: " + String(err));
+    }
   }
 
   return await evalTS("runScriptFile", paths.scriptPath);

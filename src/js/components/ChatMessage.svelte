@@ -151,6 +151,7 @@
     font-style: italic;
     font-size: 12px;
     margin: 0;
+    white-space: pre-wrap;
   }
   .message__meta {
     font-size: 10px;

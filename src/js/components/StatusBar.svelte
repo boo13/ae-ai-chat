@@ -32,23 +32,40 @@
     const seconds = (totalSeconds % 60).toString().padStart(2, "0");
     return `${minutes}:${seconds}`;
   });
+
+  const showDetails = $derived.by(
+    () =>
+      Boolean(status.raw) &&
+      (status.phase === "error" || status.phase === "timeout" || status.phase === "cancelled")
+  );
 </script>
 
-<div class={`status-bar ${toneClass}`}>
-  <span class="status-bar__dot" aria-hidden="true"></span>
-  <span class="status-bar__provider">{providerName}</span>
-  <span class="status-bar__text">{status.text}</span>
-  <span class="status-bar__elapsed">{elapsedLabel}</span>
+<div class={`status-shell ${toneClass}`}>
+  <div class="status-bar">
+    <span class="status-bar__dot" aria-hidden="true"></span>
+    <span class="status-bar__provider">{providerName}</span>
+    <span class="status-bar__text">{status.text}</span>
+    <span class="status-bar__elapsed">{elapsedLabel}</span>
+  </div>
+
+  {#if showDetails}
+    <details class="status-details" open={status.phase === "error"}>
+      <summary>Details</summary>
+      <pre>{status.raw}</pre>
+    </details>
+  {/if}
 </div>
 
 <style>
+  .status-shell {
+    background: #191919;
+    border-top: 1px solid #333;
+  }
   .status-bar {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 12px;
-    background: #191919;
-    border-top: 1px solid #333;
     color: #cfcfcf;
     font-size: 11px;
     line-height: 1.4;
@@ -81,6 +98,32 @@
     color: #8a8a8a;
     font-variant-numeric: tabular-nums;
     flex: 0 0 auto;
+  }
+  .status-details {
+    padding: 0 12px 10px;
+    color: #d7d7d7;
+    font-size: 11px;
+  }
+  .status-details summary {
+    cursor: pointer;
+    color: #9fbfff;
+    user-select: none;
+    outline: none;
+    margin-bottom: 6px;
+  }
+  .status-details pre {
+    margin: 0;
+    padding: 8px;
+    background: #101010;
+    border: 1px solid #2f2f2f;
+    border-radius: 4px;
+    color: #cfcfcf;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 220px;
+    overflow: auto;
+    font-size: 10px;
+    line-height: 1.45;
   }
   .status-bar--active .status-bar__dot {
     background: #4a9eff;
