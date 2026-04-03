@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ActionIcon from "./ActionIcon.svelte";
   import { quickActions } from "../lib/actions";
 
   interface Props {
@@ -22,7 +23,9 @@
       onclick={() => onclick(action)}
       title={action.label}
     >
-      <span class="action-icon">{action.icon}</span>
+      <span class="action-icon">
+        <ActionIcon name={action.icon} />
+      </span>
       <span class="action-label">{action.label}</span>
     </button>
   {/each}
@@ -60,7 +63,12 @@
     cursor: not-allowed;
   }
   .action-icon {
-    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex: none;
   }
   .action-label {
     font-size: 11px;
