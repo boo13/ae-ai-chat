@@ -19,14 +19,161 @@ interface CompInfo {
   error?: string;
 }
 
+interface SelectedLayerEffectProperty {
+  name: string;
+  matchName: string;
+  value: string;
+}
+
+interface SelectedLayerEffect {
+  effectName: string;
+  effectMatchName: string;
+  properties: SelectedLayerEffectProperty[];
+}
+
+interface SelectedLayerKeyframedProperty {
+  name: string;
+  numKeys: number;
+  firstKeyTime: number;
+  lastKeyTime: number;
+}
+
+interface SelectedLayerExpression {
+  name: string;
+  expression: string;
+}
+
+interface SelectedLayerDetails {
+  layers: {
+    name: string;
+    index: number;
+    type: string;
+    effects: SelectedLayerEffect[];
+    keyframed: SelectedLayerKeyframedProperty[];
+    expressions: SelectedLayerExpression[];
+  }[];
+}
+
+interface SelectedPropertyDetail {
+  kind: "property" | "group";
+  name: string;
+  matchName: string;
+  valueType?: string;
+  currentValue?: string;
+  keyframes?: { time: number; value: string }[];
+  expression?: string;
+  childProperties?: string[];
+}
+
+interface SelectedPropertyDetails {
+  properties: SelectedPropertyDetail[];
+}
+
 export interface ChatContext {
   systemContext: string;
   projectRoot?: string;
 }
 
+function formatSeconds(value: number): string {
+  if (!Number.isFinite(value)) return "?s";
+  const rounded = Math.abs(value - Math.round(value)) < 0.001 ? Math.round(value) : value;
+  return `${rounded}s`;
+}
+
+function formatExpressionInline(expression: string): string {
+  return expression.replace(/\s+/g, " ").trim();
+}
+
+function buildSelectedLayerDetailsSection(details: SelectedLayerDetails | null): string[] {
+  if (!details?.layers?.length) return [];
+
+  const usefulLayers = details.layers.filter(
+    (layer) =>
+      layer.effects.length > 0 ||
+      layer.keyframed.length > 0 ||
+      layer.expressions.length > 0
+  );
+  if (usefulLayers.length === 0) return [];
+
+  const lines: string[] = ["## Selected Layer Details"];
+
+  for (const layer of usefulLayers) {
+    lines.push(`Layer ${layer.index} - "${layer.name}" (${layer.type})`);
+
+    if (layer.effects.length > 0) {
+      lines.push("  Effects:");
+      for (const effect of layer.effects) {
+        lines.push(`    ${effect.effectName} (${effect.effectMatchName})`);
+        for (const prop of effect.properties) {
+          lines.push(`      ${prop.name} | ${prop.value}`);
+        }
+      }
+    }
+
+    if (layer.keyframed.length > 0) {
+      const keyframedSummary = layer.keyframed
+        .map(
+          (prop) =>
+            `${prop.name} (${prop.numKeys} keys, ${formatSeconds(prop.firstKeyTime)}-${formatSeconds(prop.lastKeyTime)})`
+        )
+        .join(", ");
+      lines.push(`  Keyframed: ${keyframedSummary}`);
+    }
+
+    if (layer.expressions.length > 0) {
+      lines.push("  Expressions:");
+      for (const expression of layer.expressions) {
+        lines.push(`    ${expression.name}: ${formatExpressionInline(expression.expression)}`);
+      }
+    }
+  }
+
+  return lines;
+}
+
+function buildSelectedPropertiesSection(details: SelectedPropertyDetails | null): string[] {
+  if (!details?.properties?.length) return [];
+
+  const lines: string[] = ["## Selected Properties"];
+
+  for (const prop of details.properties) {
+    if (prop.kind === "group") {
+      lines.push(`Group: ${prop.name} (${prop.matchName})`);
+      if (prop.childProperties?.length) {
+        lines.push(`  Children: ${prop.childProperties.join(", ")}`);
+      }
+      continue;
+    }
+
+    lines.push(`${prop.name} (${prop.matchName}) [${prop.valueType || "unknown"}]`);
+
+    if (typeof prop.currentValue === "string" && prop.currentValue.length > 0) {
+      lines.push(`  Current: ${prop.currentValue}`);
+    }
+
+    if (prop.keyframes?.length) {
+      lines.push("  Keyframes:");
+      for (const keyframe of prop.keyframes) {
+        lines.push(`    ${formatSeconds(keyframe.time)} | ${keyframe.value}`);
+      }
+    }
+
+    if (prop.expression) {
+      lines.push("  Expression:");
+      for (const line of prop.expression.split(/\r?\n/)) {
+        lines.push(`    ${line}`);
+      }
+    }
+  }
+
+  return lines;
+}
+
 export async function buildContext(userMessage?: string): Promise<ChatContext> {
   let projectInfo: ProjectInfo | null = null;
   let compInfo: CompInfo | null = null;
+  let selectedLayerDetails: SelectedLayerDetails | null = null;
+  let selectedPropertyDetails: SelectedPropertyDetails | null = null;
   let analysisSummary = "";
   let projectRoot = "";
 
@@ -64,6 +211,24 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
     }
   } catch {
     // No cached analysis
+  }
+
+  try {
+    const raw = await evalTS("getSelectedLayerDetails");
+    if (raw && typeof raw === "object" && Array.isArray((raw as any).layers)) {
+      selectedLayerDetails = raw as SelectedLayerDetails;
+    }
+  } catch {
+    // No selected layer details available
+  }
+
+  try {
+    const raw = await evalTS("getSelectedPropertyDetails");
+    if (raw && typeof raw === "object" && Array.isArray((raw as any).properties)) {
+      selectedPropertyDetails = raw as SelectedPropertyDetails;
+    }
+  } catch {
+    // No selected property details available
   }
 
   const lines: string[] = ["# AE Project Context"];
@@ -109,6 +274,18 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
   if (analysisSummary) {
     lines.push("");
     lines.push(analysisSummary);
+  }
+
+  const selectedLayerLines = buildSelectedLayerDetailsSection(selectedLayerDetails);
+  if (selectedLayerLines.length > 0) {
+    lines.push("");
+    lines.push(...selectedLayerLines);
+  }
+
+  const selectedPropertyLines = buildSelectedPropertiesSection(selectedPropertyDetails);
+  if (selectedPropertyLines.length > 0) {
+    lines.push("");
+    lines.push(...selectedPropertyLines);
   }
 
   lines.push("");

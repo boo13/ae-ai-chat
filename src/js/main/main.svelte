@@ -4,12 +4,15 @@
   import ProviderPicker from "../components/ProviderPicker.svelte";
   import { providerRegistry } from "../lib/provider-config";
   import {
+    annotateScriptWithError,
     clearAiAction,
     parseAiActionResponse,
+    readAiActionScript,
     runAiAction,
     saveAiAction,
   } from "../lib/ai-action";
   import { buildContext } from "../lib/context";
+  import { getErrorHint } from "../lib/error-patterns";
   import ChatMessageComponent from "../components/ChatMessage.svelte";
   import ChatInput from "../components/ChatInput.svelte";
   import ActionBar from "../components/ActionBar.svelte";
@@ -28,6 +31,7 @@
   let sessionId: string | undefined = $state(undefined);
   let chatArea: HTMLDivElement | undefined = $state();
   let lastError: string = $state("");
+  let lastErrorLine: number | null = $state(null);
   let pendingScreenshot: { path: string; fileName: string } | null = $state(null);
   let sessionProjectRoot: string | undefined = $state();
   let didInitializeAiAction: boolean = $state(false);
@@ -112,6 +116,11 @@
     aiActionWarnings = warnings;
   }
 
+  function rememberError(error: string, errorLine: number | null = null) {
+    lastError = error;
+    lastErrorLine = errorLine;
+  }
+
   function handleCancel() {
     setStatus({
       phase: "cancelled",
@@ -126,7 +135,7 @@
     model = provider.models[0]?.value || "";
     sessionId = undefined;
     messages = [];
-    lastError = "";
+    rememberError("");
     pendingScreenshot = null;
     setAiActionWarnings([]);
     setStatus(null);
@@ -211,7 +220,7 @@
         addMessage("system", result.result, {
           duration_ms: result.duration_ms,
         });
-        if (!result.cancelled) lastError = result.result;
+        if (!result.cancelled) rememberError(result.result);
       } else {
         const parsed = parseAiActionResponse(result.result);
         const displayText = parsed.displayText || "AI Action updated.";
@@ -273,7 +282,10 @@
                   terminal: true,
                 });
                 addMessage("system", "AI Action failed: " + runResult.error);
-                lastError = String(runResult.error);
+                rememberError(
+                  String(runResult.error),
+                  typeof runResult.errorLine === "number" ? runResult.errorLine : null
+                );
               } else {
                 setStatus({
                   phase: "completed",
@@ -304,7 +316,7 @@
         terminal: true,
       });
       addMessage("system", "Error: " + errMsg);
-      lastError = errMsg;
+      rememberError(errMsg);
     } finally {
       isLoading = false;
       activeAbortController = null;
@@ -333,7 +345,7 @@
     } catch (err: any) {
       const errMsg = err?.message || String(err);
       addMessage("system", "Screenshot failed: " + errMsg);
-      lastError = errMsg;
+      rememberError(errMsg);
     } finally {
       isLoading = false;
     }
@@ -356,7 +368,7 @@
         const result = await evalTS("runAnalysisScript");
         if (result && "error" in result && result.error) {
           addMessage("system", "Analysis error: " + result.error);
-          lastError = String(result.error);
+          rememberError(String(result.error));
         } else {
           addMessage(
             "system",
@@ -366,7 +378,7 @@
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         addMessage("system", "Analysis failed: " + errMsg);
-        lastError = errMsg;
+        rememberError(errMsg);
       } finally {
         isLoading = false;
       }
@@ -378,9 +390,20 @@
         addMessage("system", "No recent error to fix.");
         return;
       }
-      await handleSend(
-        "Diagnose this error and suggest or implement a fix:\n\n" + lastError
-      );
+      const script = readAiActionScript(sessionProjectRoot);
+      const hint = getErrorHint(lastError);
+      let prompt = "Diagnose this error and suggest or implement a fix:\n\nError: " + lastError;
+
+      if (script) {
+        const annotated = annotateScriptWithError(script, lastError, lastErrorLine ?? undefined);
+        prompt += "\n\nScript that produced this error:\n```jsx\n" + annotated + "\n```";
+      }
+
+      if (hint) {
+        prompt += "\n\nHint: " + hint;
+      }
+
+      await handleSend(prompt);
       return;
     }
 
@@ -398,13 +421,17 @@
         const runResult = await runAiAction(sessionProjectRoot);
         if (runResult && "error" in runResult && runResult.error) {
           addMessage("system", "AI Action failed: " + runResult.error);
-          lastError = String(runResult.error);
+          rememberError(
+            String(runResult.error),
+            typeof runResult.errorLine === "number" ? runResult.errorLine : null
+          );
         } else {
           addMessage("system", "AI Action executed successfully.");
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         addMessage("system", "AI Action unavailable: " + errMsg);
+        rememberError(errMsg);
       }
       return;
     }

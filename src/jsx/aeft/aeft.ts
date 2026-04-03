@@ -69,6 +69,254 @@ function getExpressionNames(layer: Layer): string[] {
   return names;
 }
 
+function truncateString(value: string, maxLength: number): string {
+  if (!value) return "";
+  if (value.length <= maxLength) return value;
+  return value.slice(0, maxLength - 3) + "...";
+}
+
+function stringifyValue(value: any): string {
+  if (value === null) return "null";
+  if (typeof value === "undefined") return "undefined";
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "string") return value;
+
+  try {
+    if (value instanceof Array) {
+      return JSON.stringify(value);
+    }
+  } catch (e) {}
+
+  try {
+    if (typeof value.length === "number" && typeof value !== "string") {
+      var items: any[] = [];
+      var count = Math.min(value.length, 8);
+      for (var i = 0; i < count; i++) {
+        items.push(value[i]);
+      }
+      if (value.length > count) {
+        items.push("...");
+      }
+      return JSON.stringify(items);
+    }
+  } catch (e) {}
+
+  try {
+    return JSON.stringify(value);
+  } catch (e) {}
+
+  try {
+    return String(value);
+  } catch (e) {}
+
+  return "[unavailable]";
+}
+
+function getPropertyValueTypeName(prop: Property): string {
+  try {
+    switch (prop.propertyValueType) {
+      case PropertyValueType.NO_VALUE:
+        return "NO_VALUE";
+      case PropertyValueType.ThreeD_SPATIAL:
+        return "ThreeD_SPATIAL";
+      case PropertyValueType.ThreeD:
+        return "ThreeD";
+      case PropertyValueType.TwoD_SPATIAL:
+        return "TwoD_SPATIAL";
+      case PropertyValueType.TwoD:
+        return "TwoD";
+      case PropertyValueType.OneD:
+        return "OneD";
+      case PropertyValueType.COLOR:
+        return "COLOR";
+      case PropertyValueType.CUSTOM_VALUE:
+        return "CUSTOM_VALUE";
+      case PropertyValueType.MARKER:
+        return "MARKER";
+      case PropertyValueType.LAYER_INDEX:
+        return "LAYER_INDEX";
+      case PropertyValueType.MASK_INDEX:
+        return "MASK_INDEX";
+      case PropertyValueType.SHAPE:
+        return "SHAPE";
+      case PropertyValueType.TEXT_DOCUMENT:
+        return "TEXT_DOCUMENT";
+    }
+  } catch (e) {}
+
+  try {
+    return String(prop.propertyValueType);
+  } catch (e) {}
+
+  return "unknown";
+}
+
+function walkLeafProperties(root: any, visitor: (prop: Property) => boolean | void): boolean {
+  if (!root) return false;
+
+  try {
+    if (root instanceof Property) {
+      return visitor(root) === false;
+    }
+  } catch (e) {}
+
+  var numProperties = 0;
+  try {
+    numProperties = root.numProperties || 0;
+  } catch (e) {
+    numProperties = 0;
+  }
+
+  for (var i = 1; i <= numProperties; i++) {
+    var child = null;
+    try {
+      child = root.property(i);
+    } catch (e) {
+      child = null;
+    }
+    if (!child) continue;
+    if (walkLeafProperties(child, visitor)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getEffectPropertyDetails(effect: PropertyGroup, maxProperties: number) {
+  var properties: { name: string; matchName: string; value: string }[] = [];
+
+  walkLeafProperties(effect, function (prop) {
+    if (properties.length >= maxProperties) {
+      return false;
+    }
+
+    try {
+      if (prop.propertyValueType === PropertyValueType.NO_VALUE) {
+        return;
+      }
+    } catch (e) {
+      return;
+    }
+
+    var value = "";
+    try {
+      value = stringifyValue(prop.value);
+    } catch (e) {
+      return;
+    }
+
+    properties.push({
+      name: prop.name || "Unnamed Property",
+      matchName: prop.matchName || "",
+      value: truncateString(value, 120),
+    });
+  });
+
+  return properties;
+}
+
+function getLayerKeyframedDetails(layer: Layer, maxProperties: number) {
+  var keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[] = [];
+
+  for (var i = 1; i <= layer.numProperties; i++) {
+    var group = null;
+    try {
+      group = layer.property(i);
+    } catch (e) {
+      group = null;
+    }
+    if (!group) continue;
+
+    var shouldStop = walkLeafProperties(group, function (prop) {
+      if (keyframed.length >= maxProperties) {
+        return false;
+      }
+
+      var numKeys = 0;
+      try {
+        numKeys = prop.numKeys;
+      } catch (e) {
+        numKeys = 0;
+      }
+      if (!numKeys || numKeys < 1) {
+        return;
+      }
+
+      var firstKeyTime = 0;
+      var lastKeyTime = 0;
+      try {
+        firstKeyTime = prop.keyTime(1);
+        lastKeyTime = prop.keyTime(numKeys);
+      } catch (e) {
+        return;
+      }
+
+      keyframed.push({
+        name: prop.name || "Unnamed Property",
+        numKeys: numKeys,
+        firstKeyTime: firstKeyTime,
+        lastKeyTime: lastKeyTime,
+      });
+    });
+
+    if (shouldStop || keyframed.length >= maxProperties) {
+      break;
+    }
+  }
+
+  return keyframed;
+}
+
+function getLayerExpressionDetails(layer: Layer, maxProperties: number) {
+  var expressions: { name: string; expression: string }[] = [];
+
+  for (var i = 1; i <= layer.numProperties; i++) {
+    var group = null;
+    try {
+      group = layer.property(i);
+    } catch (e) {
+      group = null;
+    }
+    if (!group) continue;
+
+    var shouldStop = walkLeafProperties(group, function (prop) {
+      if (expressions.length >= maxProperties) {
+        return false;
+      }
+
+      try {
+        if (!(prop as any).canSetExpression || !prop.expressionEnabled) {
+          return;
+        }
+      } catch (e) {
+        return;
+      }
+
+      var expression = "";
+      try {
+        expression = prop.expression || "";
+      } catch (e) {
+        expression = "";
+      }
+      if (!expression) {
+        return;
+      }
+
+      expressions.push({
+        name: prop.name || "Unnamed Property",
+        expression: truncateString(expression, 200),
+      });
+    });
+
+    if (shouldStop || expressions.length >= maxProperties) {
+      break;
+    }
+  }
+
+  return expressions;
+}
+
 function buildAnalysisSummary(comp: CompItem): string {
   var lines: string[] = [];
   var maxLayers = Math.min(comp.numLayers, 50);
@@ -198,6 +446,198 @@ export const getActiveCompInfo = () => {
   };
 };
 
+export const getSelectedLayerDetails = () => {
+  var comp = getActiveComp();
+  if (!comp) {
+    return { layers: [] };
+  }
+
+  var MAX_LAYERS = 3;
+  var MAX_EFFECTS = 5;
+  var MAX_EFFECT_PROPERTIES = 8;
+  var MAX_KEYFRAMED_PROPERTIES = 20;
+  var MAX_EXPRESSIONS = 10;
+  var MAX_SERIALIZED_SIZE = 4096;
+
+  var layers: {
+    name: string;
+    index: number;
+    type: string;
+    effects: {
+      effectName: string;
+      effectMatchName: string;
+      properties: { name: string; matchName: string; value: string }[];
+    }[];
+    keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[];
+    expressions: { name: string; expression: string }[];
+  }[] = [];
+
+  var selectedCount = Math.min(comp.selectedLayers ? comp.selectedLayers.length : 0, MAX_LAYERS);
+  for (var i = 0; i < selectedCount; i++) {
+    var layer = comp.selectedLayers[i];
+    if (!layer) continue;
+
+    var effects: {
+      effectName: string;
+      effectMatchName: string;
+      properties: { name: string; matchName: string; value: string }[];
+    }[] = [];
+    try {
+      var effectParade = layer.property("ADBE Effect Parade");
+      if (effectParade) {
+        var effectCount = Math.min(effectParade.numProperties, MAX_EFFECTS);
+        for (var j = 1; j <= effectCount; j++) {
+          var effect = null;
+          try {
+            effect = effectParade.property(j);
+          } catch (e) {
+            effect = null;
+          }
+          if (!effect) continue;
+
+          effects.push({
+            effectName: effect.name || "Unnamed Effect",
+            effectMatchName: effect.matchName || "",
+            properties: getEffectPropertyDetails(effect as PropertyGroup, MAX_EFFECT_PROPERTIES),
+          });
+        }
+      }
+    } catch (e) {}
+
+    layers.push({
+      name: layer.name,
+      index: layer.index,
+      type: getSafeLayerType(layer),
+      effects: effects,
+      keyframed: getLayerKeyframedDetails(layer, MAX_KEYFRAMED_PROPERTIES),
+      expressions: getLayerExpressionDetails(layer, MAX_EXPRESSIONS),
+    });
+  }
+
+  var result = { layers: layers };
+  while (result.layers.length > 0) {
+    var serialized = "";
+    try {
+      serialized = JSON.stringify(result);
+    } catch (e) {
+      serialized = "";
+    }
+    if (!serialized || serialized.length <= MAX_SERIALIZED_SIZE) {
+      break;
+    }
+    result.layers.pop();
+  }
+
+  return result;
+};
+
+export const getSelectedPropertyDetails = () => {
+  var comp = getActiveComp();
+  if (!comp) {
+    return { properties: [] };
+  }
+
+  var MAX_PROPERTIES = 5;
+  var MAX_TOTAL_KEYFRAMES = 50;
+
+  var properties: any[] = [];
+  var totalKeyframes = 0;
+  var selectedCount = Math.min(comp.selectedProperties ? comp.selectedProperties.length : 0, MAX_PROPERTIES);
+
+  for (var i = 0; i < selectedCount; i++) {
+    var selected = comp.selectedProperties[i];
+    if (!selected) continue;
+
+    try {
+      if (selected instanceof Property) {
+        var currentValue = "[unavailable]";
+        try {
+          currentValue = truncateString(stringifyValue(selected.value), 240);
+        } catch (e) {}
+
+        var keyframes: { time: number; value: string }[] = [];
+        var remainingKeyframes = MAX_TOTAL_KEYFRAMES - totalKeyframes;
+        var numKeys = 0;
+        try {
+          numKeys = selected.numKeys || 0;
+        } catch (e) {
+          numKeys = 0;
+        }
+
+        var keyframeCount = Math.min(numKeys, remainingKeyframes);
+        for (var j = 1; j <= keyframeCount; j++) {
+          var keyTime = 0;
+          var keyValue = "";
+          try {
+            keyTime = selected.keyTime(j);
+            keyValue = truncateString(stringifyValue(selected.keyValue(j)), 240);
+          } catch (e) {
+            continue;
+          }
+
+          keyframes.push({
+            time: keyTime,
+            value: keyValue,
+          });
+          totalKeyframes++;
+        }
+
+        var expression = "";
+        try {
+          if ((selected as any).canSetExpression && selected.expressionEnabled) {
+            expression = selected.expression || "";
+          }
+        } catch (e) {
+          expression = "";
+        }
+
+        properties.push({
+          kind: "property",
+          name: selected.name || "Unnamed Property",
+          matchName: selected.matchName || "",
+          valueType: getPropertyValueTypeName(selected),
+          currentValue: currentValue,
+          keyframes: keyframes,
+          expression: expression,
+        });
+        continue;
+      }
+    } catch (e) {}
+
+    try {
+      if (selected instanceof PropertyGroup) {
+        var childNames: string[] = [];
+        var childCount = 0;
+        try {
+          childCount = Math.min(selected.numProperties || 0, 20);
+        } catch (e) {
+          childCount = 0;
+        }
+        for (var k = 1; k <= childCount; k++) {
+          var child = null;
+          try {
+            child = selected.property(k);
+          } catch (e) {
+            child = null;
+          }
+          if (child && child.name) {
+            childNames.push(child.name);
+          }
+        }
+
+        properties.push({
+          kind: "group",
+          name: selected.name || "Unnamed Group",
+          matchName: selected.matchName || "",
+          childProperties: childNames,
+        });
+      }
+    } catch (e) {}
+  }
+
+  return { properties: properties };
+};
+
 export const runAnalysisScript = () => {
   var comp = getActiveComp();
   if (!comp) {
@@ -239,7 +679,11 @@ export const runScriptFile = (filePath: string) => {
     return { success: true, message: "Script executed successfully.", result: String(result) };
   } catch (e: any) {
     try { app.endUndoGroup(); } catch (_) {}
-    return { error: "Script failed: " + e.toString() };
+    return {
+      error: "Script failed: " + e.toString(),
+      errorLine: e.line || null,
+      errorName: e.name || null,
+    };
   }
 };
 

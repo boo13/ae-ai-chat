@@ -79,6 +79,31 @@ function toSummary(displayText: string): string {
   return firstLine || "AI Action ready";
 }
 
+function parseErrorLineNumber(errorString: string, errorLine?: number): number | null {
+  if (typeof errorLine === "number" && Number.isInteger(errorLine) && errorLine > 0) {
+    return errorLine;
+  }
+
+  const patterns = [/\(line (\d+)\)/i, /Line:\s*(\d+)/i, /at line (\d+)/i];
+  for (const pattern of patterns) {
+    const match = errorString.match(pattern);
+    if (!match) continue;
+
+    const parsed = Number.parseInt(match[1], 10);
+    if (Number.isInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function formatScriptLines(lines: string[], startLine = 1): string {
+  return lines
+    .map((line, index) => `${startLine + index}: ${line}`)
+    .join("\n");
+}
+
 export function parseAiActionResponse(content: string): ParsedAiActionResponse {
   const AI_ACTION_REGEX = /<ai-action(?:\s+run="(true|false)")?>([\s\S]*?)<\/ai-action>/gi;
   const matches: RegExpExecArray[] = [];
@@ -140,6 +165,51 @@ export function hasAiAction(projectRoot?: string): boolean {
   if (!paths) return false;
 
   return fs.existsSync(paths.scriptPath);
+}
+
+export function readAiActionScript(projectRoot?: string): string | null {
+  if (!fs) return null;
+
+  const paths = resolveAiActionPaths(projectRoot);
+  if (!paths || !fs.existsSync(paths.scriptPath)) return null;
+
+  try {
+    return fs.readFileSync(paths.scriptPath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+export function annotateScriptWithError(
+  script: string,
+  errorString: string,
+  errorLine?: number
+): string {
+  const lines = script.split(/\r?\n/);
+  const resolvedLine = parseErrorLineNumber(errorString, errorLine);
+
+  if (
+    typeof resolvedLine === "number" &&
+    Number.isInteger(resolvedLine) &&
+    resolvedLine >= 1 &&
+    resolvedLine <= lines.length
+  ) {
+    const targetIndex = resolvedLine - 1;
+    const annotatedLines = [...lines];
+    const targetLine = annotatedLines[targetIndex] || "";
+    annotatedLines[targetIndex] = targetLine.trim().length > 0
+      ? `${targetLine}  // <-- ERROR HERE`
+      : "// <-- ERROR HERE";
+
+    const startIndex = Math.max(0, targetIndex - 5);
+    const endIndex = Math.min(annotatedLines.length, targetIndex + 6);
+    return formatScriptLines(
+      annotatedLines.slice(startIndex, endIndex),
+      startIndex + 1
+    );
+  }
+
+  return formatScriptLines(lines.slice(0, 100));
 }
 
 export function saveAiAction(
