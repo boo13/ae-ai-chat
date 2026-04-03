@@ -67,6 +67,95 @@ export const textCepPatch = (e: KeyboardEvent) => {
   }
 };
 
+const primaryModifierPressed = (event: KeyboardEvent) => {
+  const isMac = os.platform() === "darwin";
+  return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+};
+
+const isTextField = (
+  element: EventTarget | null
+): element is HTMLInputElement | HTMLTextAreaElement => {
+  return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
+};
+
+const isEditableElement = (element: EventTarget | null): element is HTMLElement => {
+  return element instanceof HTMLElement && element.isContentEditable;
+};
+
+const execPanelCommand = (command: "copy" | "cut" | "paste" | "selectAll") => {
+  if (typeof document.execCommand === "function") {
+    return document.execCommand(command);
+  }
+  return false;
+};
+
+const selectNodeContents = (node: HTMLElement) => {
+  const selection = window.getSelection();
+  if (!selection) return false;
+
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return true;
+};
+
+const selectAllWithinScope = (activeElement: Element | null, scopeSelector: string) => {
+  if (isTextField(activeElement)) {
+    activeElement.select();
+    return true;
+  }
+
+  if (isEditableElement(activeElement)) {
+    return execPanelCommand("selectAll");
+  }
+
+  const scopedRoot =
+    (activeElement instanceof Element
+      ? activeElement.closest<HTMLElement>(scopeSelector)
+      : null) ?? document.querySelector<HTMLElement>(scopeSelector);
+
+  if (!scopedRoot) return false;
+  return selectNodeContents(scopedRoot);
+};
+
+export const installClipboardShortcuts = (scopeSelector = "[data-select-scope='chat-history']") => {
+  window.addEventListener("keydown", (event) => {
+    if (!primaryModifierPressed(event) || event.altKey || event.shiftKey) return;
+
+    const key = event.key.toLowerCase();
+    const activeElement = document.activeElement;
+    const hasSelection = Boolean(window.getSelection()?.toString());
+
+    if (key === "c" && hasSelection) {
+      event.preventDefault();
+      execPanelCommand("copy");
+      return;
+    }
+
+    if (key === "x" && (isTextField(activeElement) || isEditableElement(activeElement))) {
+      event.preventDefault();
+      execPanelCommand("cut");
+      return;
+    }
+
+    if (key === "v" && (isTextField(activeElement) || isEditableElement(activeElement))) {
+      event.preventDefault();
+      execPanelCommand("paste");
+      return;
+    }
+
+    if (key === "a") {
+      event.preventDefault();
+      selectAllWithinScope(activeElement, scopeSelector);
+    }
+  });
+};
+
+export const selectAllInPanelScope = (scopeSelector = "[data-select-scope='chat-history']") => {
+  return selectAllWithinScope(document.activeElement, scopeSelector);
+};
+
 /**
  * Prevents the user from dropping files or URLs onto the panel and navigating away
  */

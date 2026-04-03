@@ -1,6 +1,10 @@
 import { company, displayName, version } from "../../../shared/shared";
-import { dispatchTS, openLinkInBrowser } from "./bolt";
-import { keyRegisterOverride, dropDisable } from "./cep";
+import {
+  keyRegisterOverride,
+  dropDisable,
+  installClipboardShortcuts,
+  selectAllInPanelScope,
+} from "./cep";
 
 const buildFlyoutMenu = () => {
   const menu = `<Menu>
@@ -49,27 +53,58 @@ const buildFlyoutMenu = () => {
 
 const buildContextMenu = () => {
   console.log("buildContextMenu");
+  const runEditCommand = (command: "copy" | "cut" | "paste" | "selectAll") => {
+    if (typeof document.execCommand === "function") {
+      document.execCommand(command);
+    }
+  };
+
   const menuObj = {
     menu: [
+      {
+        label: "Copy",
+        enabled: true,
+        checked: false,
+        checkable: false,
+        id: "edit-copy",
+      },
+      {
+        label: "Cut",
+        enabled: true,
+        checked: false,
+        checkable: false,
+        id: "edit-cut",
+      },
+      {
+        label: "Paste",
+        enabled: true,
+        checked: false,
+        checkable: false,
+        id: "edit-paste",
+      },
+      {
+        label: "Select All",
+        enabled: true,
+        checked: false,
+        checkable: false,
+        id: "edit-select-all",
+      },
+      {
+        label: "---",
+      },
       {
         label: "Reload",
         enabled: true,
         checked: false,
         checkable: false,
-        id: "c-0",
-        callback: () => {
-          location.reload();
-        },
+        id: "panel-reload",
       },
       {
         label: "Force Reload",
         enabled: true,
         checked: false,
         checkable: false,
-        id: "c-1",
-        callback: () => {
-          process.abort();
-        },
+        id: "panel-force-reload",
       },
     ],
   };
@@ -77,7 +112,26 @@ const buildContextMenu = () => {
     "setContextMenuByJSON",
     JSON.stringify(menuObj),
     (e: string) => {
-      menuObj.menu.find((m) => m.id === e)?.callback();
+      switch (e) {
+        case "edit-copy":
+          runEditCommand("copy");
+          break;
+        case "edit-cut":
+          runEditCommand("cut");
+          break;
+        case "edit-paste":
+          runEditCommand("paste");
+          break;
+        case "edit-select-all":
+          selectAllInPanelScope();
+          break;
+        case "panel-reload":
+          location.reload();
+          break;
+        case "panel-force-reload":
+          process.abort();
+          break;
+      }
     }
   );
 };
@@ -85,6 +139,7 @@ const buildContextMenu = () => {
 export const initializeCEP = () => {
   buildFlyoutMenu();
   buildContextMenu();
-  // keyRegisterOverride(); // Capture all Key Events Possible (many limitations on MacOS)
+  keyRegisterOverride(); // Capture edit shortcuts before the host app swallows them
+  installClipboardShortcuts();
   dropDisable(); // to prevent drop files on panel and taking over
 };

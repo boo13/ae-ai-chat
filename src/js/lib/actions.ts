@@ -1,6 +1,6 @@
 export interface QuickAction {
   label: string;
-  icon: string;
+  icon: "screenshot" | "analysis" | "describe" | "fix-error" | "ai-action";
   prompt?: string;
   handler?: string;
 }
@@ -8,28 +8,28 @@ export interface QuickAction {
 export const quickActions: QuickAction[] = [
   {
     label: "Screenshot",
-    icon: "\uD83D\uDCF7",
+    icon: "screenshot",
     handler: "takeScreenshot",
   },
   {
     label: "Run Analysis",
-    icon: "\uD83D\uDD0D",
+    icon: "analysis",
     handler: "runAnalysis",
   },
   {
     label: "Describe",
-    icon: "\uD83D\uDCCB",
+    icon: "describe",
     prompt:
       "Describe the active composition's structure, layers, and expressions in detail.",
   },
   {
     label: "Fix Last Error",
-    icon: "\uD83D\uDD27",
+    icon: "fix-error",
     handler: "fixLastError",
   },
   {
     label: "AI Action",
-    icon: "\u25B6",
+    icon: "ai-action",
     handler: "runAiAction",
   },
 ];

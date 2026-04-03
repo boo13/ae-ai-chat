@@ -509,7 +509,7 @@
       </div>
     </header>
 
-    <div class="chat-area" bind:this={chatArea}>
+    <div class="chat-area" bind:this={chatArea} data-select-scope="chat-history">
       {#each messages as msg}
         <ChatMessageComponent
           assistantName={activeProvider.displayName}
