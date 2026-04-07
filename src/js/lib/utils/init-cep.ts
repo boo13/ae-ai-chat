@@ -1,5 +1,6 @@
 import { company, displayName, version } from "../../../shared/shared";
 import {
+  copySelectionInPanelScope,
   keyRegisterOverride,
   dropDisable,
   installClipboardShortcuts,
@@ -114,7 +115,7 @@ const buildContextMenu = () => {
     (e: string) => {
       switch (e) {
         case "edit-copy":
-          runEditCommand("copy");
+          copySelectionInPanelScope();
           break;
         case "edit-cut":
           runEditCommand("cut");

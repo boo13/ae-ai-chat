@@ -1,4 +1,4 @@
-import { os } from "../cep/node";
+import { child_process, os } from "../cep/node";
 import { csi } from "./bolt";
 
 /**
@@ -89,6 +89,42 @@ const execPanelCommand = (command: "copy" | "cut" | "paste" | "selectAll") => {
   return false;
 };
 
+const copyViaHiddenTextarea = (text: string) => {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = execPanelCommand("copy");
+  document.body.removeChild(textarea);
+  return copied;
+};
+
+const writeTextToClipboard = (text: string) => {
+  if (!text) return false;
+
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      copyViaHiddenTextarea(text);
+    });
+    return true;
+  }
+
+  if (os.platform() === "darwin" && typeof child_process.spawnSync === "function") {
+    const result = child_process.spawnSync("pbcopy", [], {
+      input: text,
+      encoding: "utf8",
+    });
+    return !result.error && result.status === 0;
+  }
+
+  return copyViaHiddenTextarea(text);
+};
+
 const selectNodeContents = (node: HTMLElement) => {
   const selection = window.getSelection();
   if (!selection) return false;
@@ -119,17 +155,55 @@ const selectAllWithinScope = (activeElement: Element | null, scopeSelector: stri
   return selectNodeContents(scopedRoot);
 };
 
+const nodeIsInsideScope = (node: Node | null, scopeSelector: string) => {
+  if (!node) return false;
+  const scopedRoot = document.querySelector<HTMLElement>(scopeSelector);
+  if (!scopedRoot) return false;
+
+  if (node instanceof Element) return scopedRoot.contains(node);
+  return scopedRoot.contains(node.parentElement);
+};
+
+const getTextFieldSelection = (element: Element | null) => {
+  if (!isTextField(element)) return "";
+
+  const { selectionStart, selectionEnd, value } = element;
+  if (selectionStart === null || selectionEnd === null || selectionStart === selectionEnd) {
+    return "";
+  }
+
+  return value.slice(selectionStart, selectionEnd);
+};
+
+const getScopedSelectionText = (scopeSelector: string) => {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return "";
+
+  const range = selection.getRangeAt(0);
+  if (!nodeIsInsideScope(range.commonAncestorContainer, scopeSelector)) return "";
+  return selection.toString();
+};
+
+const copyCurrentSelection = (scopeSelector: string) => {
+  const activeElement = document.activeElement;
+  const text = getTextFieldSelection(activeElement) || getScopedSelectionText(scopeSelector);
+  if (!text) return false;
+  return writeTextToClipboard(text);
+};
+
 export const installClipboardShortcuts = (scopeSelector = "[data-select-scope='chat-history']") => {
-  window.addEventListener("keydown", (event) => {
+  window.addEventListener(
+    "keydown",
+    (event) => {
     if (!primaryModifierPressed(event) || event.altKey || event.shiftKey) return;
 
     const key = event.key.toLowerCase();
     const activeElement = document.activeElement;
-    const hasSelection = Boolean(window.getSelection()?.toString());
 
-    if (key === "c" && hasSelection) {
+    if (key === "c" && copyCurrentSelection(scopeSelector)) {
       event.preventDefault();
-      execPanelCommand("copy");
+      event.stopPropagation();
+      event.stopImmediatePropagation();
       return;
     }
 
@@ -147,13 +221,35 @@ export const installClipboardShortcuts = (scopeSelector = "[data-select-scope='c
 
     if (key === "a") {
       event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
       selectAllWithinScope(activeElement, scopeSelector);
     }
-  });
+    },
+    true
+  );
+
+  document.addEventListener(
+    "copy",
+    (event) => {
+      const text = getTextFieldSelection(document.activeElement) || getScopedSelectionText(scopeSelector);
+      if (!text) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.clipboardData?.setData("text/plain", text);
+      writeTextToClipboard(text);
+    },
+    true
+  );
 };
 
 export const selectAllInPanelScope = (scopeSelector = "[data-select-scope='chat-history']") => {
   return selectAllWithinScope(document.activeElement, scopeSelector);
+};
+
+export const copySelectionInPanelScope = (scopeSelector = "[data-select-scope='chat-history']") => {
+  return copyCurrentSelection(scopeSelector);
 };
 
 /**
