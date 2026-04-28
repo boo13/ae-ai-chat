@@ -16,6 +16,9 @@
     "dompurify": "^3.3.3",
     "marked": "^15.0.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@parcel/watcher", "core-js", "esbuild", "jsxbin", "svelte-preprocess"]
+  },
   "devDependencies": {
     "@babel/core": "^7.19.0",
     "@babel/plugin-proposal-class-properties": "^7.16.0",

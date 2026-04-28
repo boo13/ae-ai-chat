@@ -35,8 +35,8 @@ To enable CEP debug mode, use a tool such as [ZXP Installer](https://aescripts.c
 From the repo root:
 
 ```bash
-npm install
-npm run build
+pnpm install
+pnpm build
 ```
 
 Then restart After Effects and open the panel from **Window > Extensions > AE AI Chat**.
@@ -44,12 +44,12 @@ Then restart After Effects and open the panel from **Window > Extensions > AE AI
 ## Scripts
 
 ```bash
-npm run dev       # start the Vite dev server
-npm run build     # build the CEP panel into dist/cep
-npm run zxp       # package a ZXP build
-npm run package   # alias for zxp
-npm run debug     # preview the served panel in a browser
-npm run symlink   # run the local CEP symlink action
+pnpm dev       # start the Vite dev server
+pnpm build     # build the CEP panel into dist/cep
+pnpm zxp       # package a ZXP build
+pnpm package   # alias for zxp
+pnpm debug     # preview the served panel in a browser
+pnpm symlink   # run the local CEP symlink action
 ```
 
 ## Providers
@@ -125,3 +125,29 @@ These files are temporary and overwritten during the panel session.
 3. CLI providers run through Node.js child processes; `Claude API` uses the Anthropic SDK directly.
 4. Responses stream back into the panel UI with status updates.
 5. If the response contains an `<ai-action>` block, the panel saves the script and can execute it through ExtendScript.
+
+## Writing Prompts
+
+Use prompt text that tells the model what to build in After Effects right now. The model's job is to return a runnable `<ai-action run="true">` block with ExtendScript ES3 when the user wants the change executed immediately.
+
+**Use imperative voice.** Write prompts as build instructions.
+
+Good: `Build this 4-layer film treatment in the active composition and execute it immediately.`
+
+Bad: `Produce a faithful recreation spec...` / `Describe how this setup should be built...`
+
+**Explicitly request an AI Action.** The model will not use `<ai-action run="true">` unless the prompt references it — "execute immediately" alone is not enough.
+
+Good: `Respond with an AI Action and run it immediately.`
+
+Bad: `Execute it immediately.` (model may fall back to telling the user to run the script manually)
+
+**Specify exact layer and effect details.** Every layer should include name, type, blend mode, effects in order, exact property values, and exact expression strings. Do not leave room for interpretation.
+
+**Keep scope manageable.** Aim for 4 to 6 layers per prompt. Larger treatments should be split into multiple prompts — smaller prompts execute more reliably and are easier to verify.
+
+**Use display names for effects** — write `Gaussian Blur`, not `ADBE Gaussian Blur 2`. The panel already has the verified effect catalog and match-name lookup table.
+
+**Do not include filesystem instructions.** Do not ask the model to write files, save scripts to another repo, commit changes, or print implementation artifacts. The AI Action protocol handles temporary storage automatically.
+
+See `prompts/sample-prompt.md` for a reference example.
