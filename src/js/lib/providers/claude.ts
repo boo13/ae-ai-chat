@@ -14,6 +14,41 @@ import type {
 let cachedClaudePath: string | null = null;
 let cachedNodeDir: string | null = null;
 
+const CLAUDE_TIMEOUT_MS = 600000; // 10 min — matches Codex
+const CLAUDE_STALL_MS = 30000;
+const MAX_STDOUT_PARSE_FAILURES = 5;
+
+interface ClaudeLaunchDiagnostics {
+  claudePath: string;
+  cwd: string;
+  model: string;
+  sessionMode: "new" | "resume";
+  pathLookupOnly: boolean;
+  env: {
+    HOME: string;
+    PATH: string;
+    TMPDIR: string;
+    USER: string;
+  };
+}
+
+interface LaunchEnvironmentIssue {
+  message: string;
+  detail: string;
+}
+
+function shortenDetail(value: string, maxLength = 56): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxLength) return compact;
+  return compact.slice(0, maxLength - 3) + "...";
+}
+
+function pushStdoutParseFailure(target: string[], line: string) {
+  if (!line.trim()) return;
+  if (target.length >= MAX_STDOUT_PARSE_FAILURES) return;
+  target.push(shortenDetail(line, 240));
+}
+
 function findClaudePath(): string {
   if (cachedClaudePath) return cachedClaudePath;
   if (!fs) return "claude";
@@ -113,10 +148,104 @@ function getCleanEnv(): Record<string, string> {
   return env;
 }
 
-function normalizeClaudeModel(model: string): "haiku" | "sonnet" | "opus" {
+function normalizeClaudeModel(model: string): string {
   if (model === "opus") return "opus";
   if (model === "haiku") return "haiku";
   return "sonnet";
+}
+
+function buildLaunchDiagnostics(
+  options: SendMessageOptions,
+  cwd: string
+): ClaudeLaunchDiagnostics {
+  const claudePath = findClaudePath();
+  const env = getCleanEnv();
+
+  return {
+    claudePath,
+    cwd,
+    model: options.model,
+    sessionMode: options.sessionId ? "resume" : "new",
+    pathLookupOnly: claudePath === "claude",
+    env: {
+      HOME: env.HOME || "",
+      PATH: env.PATH || "",
+      TMPDIR: env.TMPDIR || "",
+      USER: env.USER || "",
+    },
+  };
+}
+
+function formatLaunchDiagnostics(diagnostics: ClaudeLaunchDiagnostics): string {
+  return [
+    "Launch diagnostics:",
+    `- claudePath: ${diagnostics.claudePath}`,
+    `- cwd: ${diagnostics.cwd}`,
+    `- model: ${diagnostics.model}`,
+    `- sessionMode: ${diagnostics.sessionMode}`,
+    `- pathLookupOnly: ${diagnostics.pathLookupOnly ? "yes" : "no"}`,
+    "- env:",
+    `  HOME=${diagnostics.env.HOME || "(empty)"}`,
+    `  PATH=${diagnostics.env.PATH || "(empty)"}`,
+    `  TMPDIR=${diagnostics.env.TMPDIR || "(empty)"}`,
+    `  USER=${diagnostics.env.USER || "(empty)"}`,
+  ].join("\n");
+}
+
+function logLaunchDiagnostics(diagnostics: ClaudeLaunchDiagnostics) {
+  console.info("[AE AI Chat][Claude] Launch diagnostics\n" + formatLaunchDiagnostics(diagnostics));
+
+  if (diagnostics.pathLookupOnly) {
+    console.warn(
+      "[AE AI Chat][Claude] Using PATH lookup for the Claude binary. AE may not inherit the same PATH as your shell."
+    );
+  }
+}
+
+function checkLaunchEnvironment(diagnostics: ClaudeLaunchDiagnostics): LaunchEnvironmentIssue | null {
+  if (!fs) return null;
+
+  const homeDir = diagnostics.env.HOME;
+  if (!homeDir) {
+    return {
+      message:
+        "Claude launch environment is missing HOME. After Effects may not be inheriting your normal shell environment.",
+      detail: "HOME is empty.\n\n" + formatLaunchDiagnostics(diagnostics),
+    };
+  }
+
+  try {
+    fs.accessSync(homeDir);
+  } catch (error: any) {
+    return {
+      message:
+        "Claude cannot access HOME from the AE panel process. Claude auth/config may be unavailable in this environment.",
+      detail:
+        `HOME access failed for ${homeDir}: ${error?.message || String(error)}\n\n` +
+        formatLaunchDiagnostics(diagnostics),
+    };
+  }
+
+  const claudeHome = path.join(homeDir, ".claude");
+  if (fs.existsSync(claudeHome)) {
+    try {
+      fs.accessSync(claudeHome);
+    } catch (error: any) {
+      return {
+        message:
+          "Claude cannot access ~/.claude from the AE panel process. Auth or session files may not be reachable from AE.",
+        detail:
+          `Access failed for ${claudeHome}: ${error?.message || String(error)}\n\n` +
+          formatLaunchDiagnostics(diagnostics),
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatErrorResult(message: string, details: string): string {
+  return `${message}\n\n${details}`;
 }
 
 function hasResolvedClaudeBinary(): boolean {
@@ -159,27 +288,84 @@ async function sendClaudeMessage(
     const fullPrompt = options.systemContext
       ? options.systemContext + "\n\n" + prompt
       : prompt;
-    const timeout = model === "opus" ? 300000 : 120000; // haiku/sonnet: 2min, opus: 5min
     const startTime = Date.now();
+
+    const cwd = resolveWorkingDirectory(options.projectRoot) || os.tmpdir();
+    const diagnostics = buildLaunchDiagnostics(options, cwd);
+    logLaunchDiagnostics(diagnostics);
+
+    const environmentIssue = checkLaunchEnvironment(diagnostics);
+    if (environmentIssue) {
+      emitStatus({
+        phase: "error",
+        text: environmentIssue.message,
+        raw: environmentIssue.detail,
+        terminal: true,
+      });
+      resolve({
+        result: formatErrorResult(environmentIssue.message, environmentIssue.detail),
+        duration_ms: 0,
+        is_error: true,
+        sessionId: options.sessionId,
+      });
+      return;
+    }
+
+    const baseArgs = [
+      "--print",
+      "--model", model,
+      "--dangerously-skip-permissions",
+      "--output-format", "stream-json",
+      "--verbose",
+      "--include-partial-messages",
+    ];
     const args = options.sessionId
-      ? ["--print", "--resume", sessionId, "--model", model]
-      : ["--print", "--session-id", sessionId, "--model", model];
+      ? [...baseArgs, "--resume", sessionId]
+      : [...baseArgs, "--session-id", sessionId];
+
+    const resetStallTimer = (() => {
+      let stallTimer: ReturnType<typeof setTimeout> | null = null;
+
+      return {
+        touch() {
+          if (stallTimer) {
+            clearTimeout(stallTimer);
+          }
+          stallTimer = setTimeout(() => {
+            emitStatus({
+              phase: "thinking",
+              text: "Still thinking...",
+            });
+          }, CLAUDE_STALL_MS);
+        },
+        clear() {
+          if (stallTimer) {
+            clearTimeout(stallTimer);
+            stallTimer = null;
+          }
+        },
+      };
+    })();
 
     const proc = child_process.spawn(
       findClaudePath(),
       args,
       {
-        cwd: resolveWorkingDirectory(options.projectRoot) || os.homedir(),
+        cwd,
         env: getCleanEnv(),
         stdio: ["pipe", "pipe", "pipe"],
       }
     );
 
-    let stdout = "";
+    let stdoutBuffer = "";
     let stderr = "";
+    const invalidStdoutLines: string[] = [];
     let killed = false;
     let cancelled = false;
-    let hasReceivedChunk = false;
+    let result = "";
+    let resolvedSessionId = sessionId;
+    let emittedFirstChunk = false;
+    let resolvedViaResult = false;
 
     emitStatus({
       phase: "connecting",
@@ -189,16 +375,19 @@ async function sendClaudeMessage(
       phase: "thinking",
       text: "Thinking...",
     });
+
     const timer = setTimeout(() => {
       killed = true;
+      resetStallTimer.clear();
       proc.kill();
-    }, timeout);
+    }, CLAUDE_TIMEOUT_MS);
+    resetStallTimer.touch();
 
-    // Wire AbortSignal for user-initiated cancel
     if (options.signal) {
       options.signal.addEventListener("abort", () => {
         cancelled = true;
         clearTimeout(timer);
+        resetStallTimer.clear();
         emitStatus({
           phase: "cancelled",
           text: "Cancelling request...",
@@ -207,17 +396,133 @@ async function sendClaudeMessage(
       }, { once: true });
     }
 
+    const processLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      resetStallTimer.touch();
+
+      try {
+        const payload = JSON.parse(trimmed);
+
+        if (payload?.type === "system" && payload?.subtype === "init") {
+          if (typeof payload.session_id === "string") {
+            resolvedSessionId = payload.session_id;
+          }
+          emitStatus({
+            phase: "connecting",
+            text: "Claude session started.",
+          });
+          return;
+        }
+
+        if (
+          payload?.type === "system" &&
+          payload?.subtype === "status" &&
+          payload?.status === "requesting"
+        ) {
+          emitStatus({
+            phase: "thinking",
+            text: "Thinking...",
+          });
+          return;
+        }
+
+        if (payload?.type === "assistant") {
+          const content: any[] = payload?.message?.content || [];
+          for (const block of content) {
+            if (block?.type === "text" && typeof block.text === "string" && block.text.trim()) {
+              result = block.text;
+              if (!emittedFirstChunk) {
+                emittedFirstChunk = true;
+                options.onChunk?.(block.text);
+                emitStatus({
+                  phase: "responding",
+                  text: "Generating response...",
+                });
+              }
+            }
+          }
+          return;
+        }
+
+        if (payload?.type === "rate_limit_event") {
+          const info = payload?.rate_limit_info;
+          if (
+            info?.status === "allowed_warning" &&
+            typeof info?.utilization === "number" &&
+            info.utilization >= 0.9
+          ) {
+            const pct = Math.round(info.utilization * 100);
+            emitStatus({
+              phase: "thinking",
+              text: `Claude API rate limit at ${pct}% — response may be slow.`,
+            });
+          }
+          return;
+        }
+
+        if (payload?.type === "result") {
+          resolvedViaResult = true;
+          clearTimeout(timer);
+          resetStallTimer.clear();
+
+          if (payload?.session_id) {
+            resolvedSessionId = payload.session_id;
+          }
+
+          if (payload?.is_error) {
+            const errText = typeof payload?.result === "string" && payload.result.trim()
+              ? payload.result.trim()
+              : "Claude reported an error.";
+            const detail = formatLaunchDiagnostics(diagnostics);
+            emitStatus({
+              phase: "error",
+              text: shortenDetail(errText, 96),
+              raw: detail,
+              terminal: true,
+            });
+            resolve({
+              result: formatErrorResult("Error: " + errText, detail),
+              duration_ms: Date.now() - startTime,
+              is_error: true,
+              sessionId: resolvedSessionId,
+            });
+            return;
+          }
+
+          const finalText = typeof payload?.result === "string" && payload.result.trim()
+            ? payload.result.trim()
+            : result;
+
+          emitStatus({
+            phase: "completed",
+            text: "Response complete.",
+            terminal: true,
+          });
+          resolve({
+            result: finalText || "(empty response)",
+            duration_ms: Date.now() - startTime,
+            is_error: false,
+            sessionId: resolvedSessionId,
+          });
+          return;
+        }
+      } catch {
+        pushStdoutParseFailure(invalidStdoutLines, trimmed);
+      }
+    };
+
     proc.stdout.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
-      stdout += text;
-      if (!hasReceivedChunk) {
-        hasReceivedChunk = true;
-        emitStatus({
-          phase: "responding",
-          text: "Generating response...",
-        });
+      stdoutBuffer += text;
+
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || "";
+
+      for (const line of lines) {
+        processLine(line);
       }
-      options.onChunk?.(text);
     });
 
     proc.stderr.on("data", (chunk: Buffer) => {
@@ -226,7 +531,16 @@ async function sendClaudeMessage(
 
     proc.on("close", (code: number | null) => {
       clearTimeout(timer);
+      resetStallTimer.clear();
       const duration_ms = Date.now() - startTime;
+
+      if (resolvedViaResult) return;
+
+      // Flush any remaining buffer
+      if (stdoutBuffer.trim()) {
+        processLine(stdoutBuffer);
+        if (resolvedViaResult) return;
+      }
 
       if (cancelled) {
         emitStatus({
@@ -239,64 +553,52 @@ async function sendClaudeMessage(
           duration_ms,
           is_error: true,
           cancelled: true,
-          sessionId,
+          sessionId: resolvedSessionId,
         });
         return;
       }
 
       if (killed) {
+        const detail = formatLaunchDiagnostics(diagnostics);
         emitStatus({
           phase: "timeout",
-          text: "Claude timed out waiting for a response.",
+          text: "Claude timed out after 10 minutes.",
           terminal: true,
         });
         resolve({
-          result: "Claude didn't respond in time. Try again or use a faster model.",
+          result: formatErrorResult(
+            "Claude didn't respond in time after 10 minutes. Try again or simplify the request.",
+            detail
+          ),
           duration_ms,
           is_error: true,
-          sessionId,
-        });
-        return;
-      }
-
-      if (stdout.trim().length > 10) {
-        const partialError = code !== 0
-          ? "\n\n" + summarizeProcessError(stderr, code)
-          : "";
-
-        emitStatus({
-          phase: code !== 0 ? "error" : "completed",
-          text: code !== 0 ? "Claude exited with an error." : "Response complete.",
-          raw: code !== 0 ? stderr : undefined,
-          terminal: true,
-        });
-
-        resolve({
-          result:
-            code !== 0
-              ? "Error: Claude exited before completing the request.\n\nPartial output:\n" +
-                stdout.trim() +
-                partialError
-              : stdout.trim(),
-          duration_ms,
-          is_error: code !== 0,
-          sessionId,
+          sessionId: resolvedSessionId,
         });
         return;
       }
 
       if (code !== 0) {
+        const summary = summarizeProcessError(stderr, code);
+        const detail = [
+          `Exit code: ${code}`,
+          stderr.trim() ? "stderr:\n" + stderr.trim() : null,
+          invalidStdoutLines.length > 0
+            ? "stdout parse failures:\n" + invalidStdoutLines.join("\n")
+            : null,
+          formatLaunchDiagnostics(diagnostics),
+        ].filter(Boolean).join("\n\n");
+        console.error("[AE AI Chat][Claude] Process exited with error\n" + detail);
         emitStatus({
           phase: "error",
-          text: "Claude exited with an error.",
-          raw: stderr,
+          text: shortenDetail(summary, 96),
+          raw: detail,
           terminal: true,
         });
         resolve({
-          result: "Error: " + summarizeProcessError(stderr, code),
+          result: formatErrorResult("Error: " + summary, detail),
           duration_ms,
           is_error: true,
-          sessionId,
+          sessionId: resolvedSessionId,
         });
         return;
       }
@@ -307,20 +609,41 @@ async function sendClaudeMessage(
         terminal: true,
       });
       resolve({
-        result: stdout.trim() || "(empty response)",
+        result: result || "(empty response)",
         duration_ms,
         is_error: false,
-        sessionId,
+        sessionId: resolvedSessionId,
       });
     });
 
     proc.on("error", (err: Error) => {
       clearTimeout(timer);
+      resetStallTimer.clear();
+      const detail = [
+        `Spawn error: ${err.message}`,
+        stderr.trim() ? "stderr:\n" + stderr.trim() : null,
+        formatLaunchDiagnostics(diagnostics),
+      ].filter(Boolean).join("\n\n");
+      console.error("[AE AI Chat][Claude] Failed to start process\n" + detail);
+      emitStatus({
+        phase: "error",
+        text:
+          diagnostics.pathLookupOnly && /not found|ENOENT/i.test(err.message)
+            ? "Claude CLI was not found from the AE panel process PATH."
+            : "Failed to start Claude CLI.",
+        raw: detail,
+        terminal: true,
+      });
       resolve({
-        result: "Failed to start Claude CLI: " + err.message,
+        result: formatErrorResult(
+          diagnostics.pathLookupOnly && /not found|ENOENT/i.test(err.message)
+            ? "Failed to start Claude CLI: AE could not resolve `claude` from its PATH."
+            : "Failed to start Claude CLI: " + err.message,
+          detail
+        ),
         duration_ms: Date.now() - startTime,
         is_error: true,
-        sessionId,
+        sessionId: resolvedSessionId,
       });
     });
 
