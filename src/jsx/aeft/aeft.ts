@@ -393,10 +393,28 @@ export const getProjectInfo = () => {
     projectPath = "";
   }
 
+  var expressionEngine = "";
+  var bitsPerChannel = 8;
+  var appVersion = "";
+  try {
+    //@ts-ignore
+    expressionEngine = String(app.project.expressionEngine || "");
+  } catch (_) {}
+  try {
+    //@ts-ignore
+    bitsPerChannel = app.project.bitsPerChannel || 8;
+  } catch (_) {}
+  try {
+    appVersion = String(app.version || "");
+  } catch (_) {}
+
   return {
     projectName: projectName,
     projectPath: projectPath,
     numItems: app.project.numItems,
+    expressionEngine: expressionEngine,
+    bitsPerChannel: bitsPerChannel,
+    appVersion: appVersion,
   };
 };
 
@@ -676,13 +694,27 @@ export const runScriptFile = (filePath: string) => {
     //@ts-ignore
     var result = $.evalFile(scriptFile);
     app.endUndoGroup();
-    return { success: true, message: "Script executed successfully.", result: String(result) };
+    //@ts-ignore
+    var exprErrors = $.global.__aiExprErrors || [];
+    //@ts-ignore
+    $.global.__aiExprErrors = [];
+    return {
+      success: exprErrors.length === 0,
+      message: exprErrors.length === 0 ? "Script executed successfully." : "Script ran but expression errors occurred.",
+      result: String(result),
+      expressionErrors: exprErrors,
+    };
   } catch (e: any) {
     try { app.endUndoGroup(); } catch (_) {}
+    //@ts-ignore
+    var catchExprErrors = $.global.__aiExprErrors || [];
+    //@ts-ignore
+    $.global.__aiExprErrors = [];
     return {
       error: "Script failed: " + e.toString(),
       errorLine: e.line || null,
       errorName: e.name || null,
+      expressionErrors: catchExprErrors,
     };
   }
 };

@@ -17,12 +17,15 @@
   import ChatInput from "../components/ChatInput.svelte";
   import ActionBar from "../components/ActionBar.svelte";
   import StatusBar from "../components/StatusBar.svelte";
-  import type { ScriptValidationWarning } from "../lib/knowledge/validator";
+  import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
+  import { buildAutoFixPrompt } from "../lib/auto-fix";
+  import type { ExpressionError } from "../lib/auto-fix";
   import type {
     ChatMessage,
     ProviderDefinition,
     ProviderStatusUpdate,
   } from "../lib/providers/provider";
+  import { version } from "../../../package.json";
 
   let messages: ChatMessage[] = $state([]);
   let isLoading: boolean = $state(false);
@@ -36,12 +39,18 @@
   let sessionProjectRoot: string | undefined = $state();
   let didInitializeAiAction: boolean = $state(false);
   let aiActionWarnings: ScriptValidationWarning[] = $state([]);
+  let aiActionErrors: ScriptValidationError[] = $state([]);
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
   let statusClearTimer: ReturnType<typeof setTimeout> | null = null;
   let statusElapsedTimer: ReturnType<typeof setInterval> | null = null;
   let statusElapsedMs: number = $state(0);
   const STATUS_CLEAR_DELAY_MS = 2000;
+
+  let autoFixAttempt: number = $state(0);
+  let autoFixOriginalPrompt: string = $state("");
+  let autoFixAborted: boolean = $state(false);
+  const AUTO_FIX_MAX = 3;
 
   function getProviderHeaderTitle(provider: ProviderDefinition | null): string {
     if (!provider) return "AE AI Chat";
@@ -139,12 +148,51 @@
   }
 
   function handleCancel() {
+    autoFixAborted = true;
     setStatus({
       phase: "cancelled",
       text: "Cancelling request...",
     });
     activeAbortController?.abort();
     activeAbortController = null;
+  }
+
+  async function triggerAutoFix(
+    errorString: string,
+    errorLine: number | null,
+    script: string | null,
+    expressionErrors: ExpressionError[],
+    validationErrors: ScriptValidationError[],
+    validationWarnings: ScriptValidationWarning[] = []
+  ) {
+    if (autoFixAborted) {
+      addMessage("system", "Auto-fix cancelled.");
+      return;
+    }
+    if (autoFixAttempt >= AUTO_FIX_MAX) {
+      addMessage(
+        "system",
+        `Auto-fix gave up after ${AUTO_FIX_MAX} attempts. Review the errors or start a new prompt.`
+      );
+      return;
+    }
+    autoFixAttempt += 1;
+    addMessage(
+      "system",
+      `Auto-fix attempt ${autoFixAttempt}/${AUTO_FIX_MAX} — sending error context to model.`
+    );
+    const fixPrompt = buildAutoFixPrompt({
+      attemptNumber: autoFixAttempt,
+      maxAttempts: AUTO_FIX_MAX,
+      originalUserMessage: autoFixOriginalPrompt,
+      errorString,
+      errorLine,
+      script,
+      expressionErrors,
+      validationErrors,
+      validationWarnings,
+    });
+    await handleSend(fixPrompt, true);
   }
 
   function handleProviderSelect(provider: ProviderDefinition) {
@@ -157,10 +205,21 @@
     pendingScreenshot = null;
     setAiActionWarnings([]);
     setStatus(null);
+    autoFixAttempt = 0;
+    autoFixOriginalPrompt = "";
+    autoFixAborted = false;
     addMessage(
       "system",
       provider.displayName + " ready. Ask about your After Effects project."
     );
+  }
+
+  async function handleUserSend(text: string) {
+    autoFixAttempt = 0;
+    autoFixOriginalPrompt = text;
+    autoFixAborted = false;
+    rememberError("");
+    await handleSend(text);
   }
 
   async function scrollToBottom() {
@@ -170,12 +229,15 @@
     }
   }
 
-  async function handleSend(text: string) {
+  async function handleSend(text: string, isAutoFix = false) {
     if (!activeProvider) return;
 
     setAiActionWarnings([]);
+    aiActionErrors = [];
     const history = messages.slice();
-    addMessage("user", text);
+    if (!isAutoFix) {
+      addMessage("user", text);
+    }
     isLoading = true;
     const imagePath = pendingScreenshot?.path;
     pendingScreenshot = null;
@@ -256,6 +318,7 @@
         }
 
         if (parsed.scriptContent) {
+          const validationErrors = parsed.validation?.errors || [];
           const warnings = parsed.validation?.warnings || [];
           setAiActionWarnings(warnings);
 
@@ -266,57 +329,124 @@
           const saved = saveAiAction(context.projectRoot, parsed.scriptContent, displayText);
           addMessage("system", "AI Action ready: " + saved.summary);
 
-          if (warnings.length > 0) {
+          if (validationErrors.length > 0) {
+            aiActionErrors = validationErrors;
             addMessage(
               "system",
-              warnings.map((warning) => warning.message).join("\n")
+              "AI Action blocked by validation errors:\n" +
+                validationErrors.map((e) => `  [${e.code}] ${e.message}`).join("\n")
             );
-          }
-
-          if (parsed.runImmediately) {
+            setStatus({
+              phase: "error",
+              text: "AI Action blocked — validation errors.",
+              terminal: true,
+            });
+            rememberError(validationErrors.map((e) => e.message).join("; "), null);
+            await triggerAutoFix(
+              validationErrors.map((e) => e.message).join("; "),
+              null,
+              parsed.scriptContent,
+              [],
+              validationErrors
+            );
+          } else {
             if (warnings.length > 0) {
-              setStatus({
-                phase: "completed",
-                text: "AI Action saved with validation warnings.",
-                terminal: true,
-              });
               addMessage(
                 "system",
-                "AI Action was not run automatically. Review the warnings, click AI Action to run anyway, or ask the assistant to fix the script."
+                warnings.map((warning) => warning.message).join("\n")
               );
-            } else {
-              setStatus({
-                phase: "running_action",
-                text: "Running AI Action...",
-              });
-              const runResult = await runAiAction(context.projectRoot);
-              if (runResult && "error" in runResult && runResult.error) {
+            }
+
+            if (parsed.runImmediately) {
+              if (warnings.length > 0) {
                 setStatus({
-                  phase: "error",
-                  text: "AI Action failed.",
-                  raw: String(runResult.error),
+                  phase: "completed",
+                  text: "AI Action saved with validation warnings.",
                   terminal: true,
                 });
-                addMessage("system", "AI Action failed: " + runResult.error);
-                rememberError(
-                  String(runResult.error),
-                  typeof runResult.errorLine === "number" ? runResult.errorLine : null
+                addMessage(
+                  "system",
+                  "AI Action was not run automatically. Review the warnings, click AI Action to run anyway, or ask the assistant to fix the script."
+                );
+                rememberError(warnings.map((w) => w.message).join("; "), null);
+                await triggerAutoFix(
+                  warnings.map((w) => w.message).join("; "),
+                  null,
+                  parsed.scriptContent,
+                  [],
+                  [],
+                  warnings
                 );
               } else {
                 setStatus({
-                  phase: "completed",
-                  text: "AI Action executed successfully.",
-                  terminal: true,
+                  phase: "running_action",
+                  text: "Running AI Action...",
                 });
-                addMessage("system", "AI Action executed successfully.");
+                const runResult = await runAiAction(context.projectRoot);
+                const exprErrors: ExpressionError[] =
+                  (runResult as any)?.expressionErrors || [];
+
+                if (runResult && "error" in runResult && runResult.error) {
+                  const errorStr = String(runResult.error);
+                  const errorLine =
+                    typeof runResult.errorLine === "number" ? runResult.errorLine : null;
+                  setStatus({
+                    phase: "error",
+                    text: "AI Action failed.",
+                    raw: errorStr,
+                    terminal: true,
+                  });
+                  addMessage("system", "AI Action failed: " + errorStr);
+                  rememberError(errorStr, errorLine);
+                  await triggerAutoFix(
+                    errorStr,
+                    errorLine,
+                    parsed.scriptContent,
+                    exprErrors,
+                    []
+                  );
+                } else if (exprErrors.length > 0) {
+                  const exprSummary = exprErrors
+                    .map(
+                      (e) =>
+                        `prop "${e.name || "?"}" line ${e.line}: ${e.error}`
+                    )
+                    .join("; ");
+                  setStatus({
+                    phase: "error",
+                    text: "AI Action ran with expression errors.",
+                    terminal: true,
+                  });
+                  addMessage("system", "AI Action ran but expression errors occurred:\n" +
+                    exprErrors.map((e) =>
+                      `  prop "${e.name || "?"}" line ${e.line}: ${e.error}` +
+                      (e.expr ? `\n    expr: "${e.expr}"` : "")
+                    ).join("\n")
+                  );
+                  rememberError(exprSummary, null);
+                  await triggerAutoFix(
+                    exprSummary,
+                    null,
+                    parsed.scriptContent,
+                    exprErrors,
+                    []
+                  );
+                } else {
+                  setStatus({
+                    phase: "completed",
+                    text: "AI Action executed successfully.",
+                    terminal: true,
+                  });
+                  addMessage("system", "AI Action executed successfully.");
+                }
               }
+            } else {
+              setStatus({
+                phase: "completed",
+                text: "AI Action ready.",
+                terminal: true,
+              });
             }
-          } else {
-            setStatus({
-              phase: "completed",
-              text: "AI Action ready.",
-              terminal: true,
-            });
           }
         }
       }
@@ -419,7 +549,7 @@
         prompt += "\n\nHint: " + hint;
       }
 
-      await handleSend(prompt);
+      await handleUserSend(prompt);
       return;
     }
 
@@ -428,6 +558,14 @@
         if (!sessionProjectRoot) {
           const context = await buildContext();
           sessionProjectRoot = context.projectRoot || sessionProjectRoot;
+        }
+
+        if (aiActionErrors.length > 0) {
+          addMessage(
+            "system",
+            "AI Action is blocked by validation errors. Ask the assistant to fix the script first."
+          );
+          return;
         }
 
         if (aiActionWarnings.length > 0) {
@@ -442,6 +580,8 @@
             typeof runResult.errorLine === "number" ? runResult.errorLine : null
           );
         } else {
+          setAiActionWarnings([]);
+          aiActionErrors = [];
           addMessage("system", "AI Action executed successfully.");
         }
       } catch (err: any) {
@@ -453,7 +593,7 @@
     }
 
     if (action.prompt) {
-      await handleSend(action.prompt);
+      await handleUserSend(action.prompt);
     }
   }
 
@@ -499,7 +639,7 @@
 {:else}
   <div class="app">
     <header class="header">
-      <span class="header__title">{activeHeaderTitle}</span>
+      <span class="header__title">{activeHeaderTitle}<span class="header__version">v{version}</span></span>
       <div class="header__controls">
         <select class="model-select" bind:value={model}>
           {#each activeProvider.models as providerModel}
@@ -532,7 +672,10 @@
 
     {#if aiActionWarnings.length > 0}
       <div class="validation-banner">
-        <div class="validation-banner__title">AI Action validation warnings</div>
+        <div class="validation-banner__header">
+          <div class="validation-banner__title">AI Action validation warnings</div>
+          <button class="validation-banner__close" aria-label="Dismiss" onclick={() => setAiActionWarnings([])}>×</button>
+        </div>
         <ul class="validation-banner__list">
           {#each aiActionWarnings as warning}
             <li>
@@ -567,7 +710,7 @@
     <ChatInput
       assistantName={activeProvider.displayName}
       disabled={isLoading}
-      onsubmit={handleSend}
+      onsubmit={handleUserSend}
       oncancel={activeAbortController ? handleCancel : undefined}
     />
   </div>
@@ -605,6 +748,12 @@
     font-size: 13px;
     font-weight: 600;
     color: #eee;
+  }
+  .header__version {
+    font-size: 10px;
+    font-weight: 400;
+    color: #666;
+    margin-left: 5px;
   }
   .header__controls {
     display: flex;
@@ -668,10 +817,27 @@
     background: #2b2114;
     color: #f2d3a2;
   }
+  .validation-banner__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
   .validation-banner__title {
     font-size: 12px;
     font-weight: 600;
-    margin-bottom: 6px;
+  }
+  .validation-banner__close {
+    background: none;
+    border: none;
+    color: #c6a46c;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+  }
+  .validation-banner__close:hover {
+    color: #f2d3a2;
   }
   .validation-banner__list {
     margin: 0;

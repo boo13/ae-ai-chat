@@ -12,7 +12,7 @@ export const quickActions: QuickAction[] = [
     handler: "takeScreenshot",
   },
   {
-    label: "Run Analysis",
+    label: "Proj Report",
     icon: "analysis",
     handler: "runAnalysis",
   },

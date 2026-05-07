@@ -3,6 +3,10 @@ import type { ScriptValidationResult } from "./knowledge/validator";
 import { validateScript } from "./knowledge/validator";
 import { csi, evalTS } from "./utils/bolt";
 import { findGitRoot } from "./providers/shared";
+import {
+  EXPRESSION_HELPER_PREAMBLE,
+  rewriteExpressionAssignments,
+} from "./expression-rewriter";
 
 const ACTION_DIR = ".session";
 const ACTION_FILE = "ai-action.jsx";
@@ -228,8 +232,20 @@ function prepareRunnableScript(
   const expanded = expandExternalScriptReference(scriptContent.trim(), projectRoot);
   const includeRewrite = rewriteIncludeDirectives(expanded.scriptContent, projectRoot);
 
+  const exprRewrite = rewriteExpressionAssignments(includeRewrite.scriptContent);
+  const finalContent =
+    exprRewrite.rewriteCount > 0
+      ? EXPRESSION_HELPER_PREAMBLE + "\n" + exprRewrite.content
+      : exprRewrite.content;
+
+  if (exprRewrite.rewriteCount > 0) {
+    console.log(
+      "[AI Action] Rewrote " + exprRewrite.rewriteCount + " expression assignment(s) for runtime error capture."
+    );
+  }
+
   return {
-    scriptContent: includeRewrite.scriptContent,
+    scriptContent: finalContent,
     expandedSourcePath: expanded.sourcePath,
     rewritten: expanded.rewritten.concat(includeRewrite.rewritten),
     unresolved: expanded.unresolved.concat(includeRewrite.unresolved),

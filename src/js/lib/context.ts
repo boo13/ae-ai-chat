@@ -5,6 +5,9 @@ interface ProjectInfo {
   projectName: string;
   projectPath: string;
   numItems: number;
+  expressionEngine?: string;
+  bitsPerChannel?: number;
+  appVersion?: string;
 }
 
 interface CompInfo {
@@ -234,8 +237,13 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
   const lines: string[] = ["# AE Project Context"];
 
   if (projectInfo) {
+    const aeMeta: string[] = [];
+    if (projectInfo.appVersion) aeMeta.push(`AE ${projectInfo.appVersion}`);
+    if (projectInfo.expressionEngine) aeMeta.push(`engine: ${projectInfo.expressionEngine}`);
+    if (projectInfo.bitsPerChannel) aeMeta.push(`${projectInfo.bitsPerChannel}bpc`);
+    const metaSuffix = aeMeta.length > 0 ? ` | ${aeMeta.join(" | ")}` : "";
     lines.push(
-      `Project: ${projectInfo.projectName} | Items: ${projectInfo.numItems}`
+      `Project: ${projectInfo.projectName} | Items: ${projectInfo.numItems}${metaSuffix}`
     );
   } else {
     lines.push("No AE project is currently open.");
@@ -251,7 +259,9 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
       const selected = compInfo.selectedLayers
         .map((l) => `${l.name} (${l.type})`)
         .join(", ");
-      lines.push(`Selected: ${selected}`);
+      lines.push(`Selected layers: ${selected}`);
+    } else {
+      lines.push("Selected layers: (none)");
     }
 
     if (compInfo.layers && compInfo.layers.length > 0) {
@@ -280,13 +290,26 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
   if (selectedLayerLines.length > 0) {
     lines.push("");
     lines.push(...selectedLayerLines);
+  } else {
+    lines.push("");
+    lines.push("## Selected Layer Details");
+    lines.push("(none — no selected layer has effects, keyframes, or expressions to report)");
   }
 
   const selectedPropertyLines = buildSelectedPropertiesSection(selectedPropertyDetails);
   if (selectedPropertyLines.length > 0) {
     lines.push("");
     lines.push(...selectedPropertyLines);
+  } else {
+    lines.push("");
+    lines.push("## Selected Properties");
+    lines.push("(none)");
   }
+
+  lines.push("");
+  lines.push(
+    "Important: trust the selection state above. If a section says (none), do NOT assume any layer/property is selected based on prior conversation."
+  );
 
   lines.push("");
   lines.push(getKnowledgeContext(userMessage));
