@@ -1,9 +1,16 @@
+import "./scripts/load-env";
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { cep, CepOptions, runAction } from "vite-cep-plugin";
 import cepConfig from "./cep.config";
 import path from "path";
 import { extendscriptConfig } from "./vite.es.config";
+
+// Override the placeholder cert password from env at build time only.
+// (cep.config.ts gets bundled into the panel, so process.env can't live there.)
+if (process.env.ZXP_CERT_PASSWORD) {
+  cepConfig.zxp.password = process.env.ZXP_CERT_PASSWORD;
+}
 
 const extensions = [".js", ".ts", ".tsx"];
 

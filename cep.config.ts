@@ -37,8 +37,8 @@ const config: CEP_Config = {
   zxp: {
     country: "US",
     province: "CA",
-    org: "ae-ai-starter",
-    password: "password",
+    org: "Randy Counsman",
+    password: "ae-ai-chat-dev",
     tsa: [
       "http://timestamp.digicert.com/",
       "http://timestamp.apple.com/ts01",
