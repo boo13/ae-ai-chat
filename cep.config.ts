@@ -1,4 +1,4 @@
-import { CEP_Config } from "vite-cep-plugin";
+import type { CEP_Config } from "vite-cep-plugin";
 import { version } from "./package.json";
 
 const config: CEP_Config = {
@@ -37,7 +37,7 @@ const config: CEP_Config = {
   zxp: {
     country: "US",
     province: "CA",
-    org: "Randy Counsman",
+    org: "RandyCounsman",
     password: "ae-ai-chat-dev",
     tsa: [
       "http://timestamp.digicert.com/",

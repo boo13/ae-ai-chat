@@ -4,6 +4,10 @@ A CEP panel for Adobe After Effects that lets you chat with AI providers directl
 
 [![Screen recording of AI Chat drawing a star](screenshots/Screenrecord_AIChat_Star.gif)](screenshots/Screenrecord_AIChat_Star.mp4)
 
+## Releases
+
+Signed `.zxp` builds are attached to GitHub Releases. Install them with [ZXP Installer](https://aescripts.com/learn/zxp-installer/).
+
 ## Architecture
 
 - CEP panel running inside After Effects with Chromium + Node.js enabled
@@ -18,7 +22,7 @@ A CEP panel for Adobe After Effects that lets you chat with AI providers directl
 
 - macOS-focused
 - Windows is not supported
-- Node.js 18-24 is recommended
+- Node.js 22.13 or newer is required
 
 ## Prerequisites
 

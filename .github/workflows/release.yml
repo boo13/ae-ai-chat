@@ -1,0 +1,51 @@
+name: Release ZXP
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and upload signed ZXP
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Verify signing secret
+        run: test -n "$ZXP_CERT_PASSWORD"
+        env:
+          ZXP_CERT_PASSWORD: ${{ secrets.ZXP_CERT_PASSWORD }}
+
+      - name: Build signed ZXP
+        run: pnpm zxp
+        env:
+          ZXP_CERT_PASSWORD: ${{ secrets.ZXP_CERT_PASSWORD }}
+
+      - name: Upload ZXP to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/zxp/com.ae-ai-chat.panel.zxp
+          fail_on_unmatched_files: true
+          generate_release_notes: true

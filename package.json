@@ -2,10 +2,24 @@
   "name": "ae-ai-chat",
   "private": true,
   "version": "0.1.1",
+  "author": "Randy Counsman <randycounsman@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/boo13/ae-ai-chat.git"
+  },
+  "homepage": "https://github.com/boo13/ae-ai-chat#readme",
+  "bugs": {
+    "url": "https://github.com/boo13/ae-ai-chat/issues"
+  },
   "type": "module",
+  "engines": {
+    "node": ">=22.13",
+    "pnpm": ">=11"
+  },
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",
     "build": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && node ./node_modules/vite/bin/vite.js build --watch false",
+    "typecheck": "svelte-check --tsconfig tsconfig-build.json && tsc -p tsconfig-build.json --noEmit",
     "zxp": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true node ./node_modules/vite/bin/vite.js build --watch false",
     "debug": "cross-env SERVE_PANEL=true node ./node_modules/vite/bin/vite.js preview",
     "package": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true node ./node_modules/vite/bin/vite.js build --watch false",
