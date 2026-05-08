@@ -48,7 +48,7 @@ release version:
     fi
 
     required_node="$(cat .nvmrc)"
-    node -e 'const req=process.argv[1].replace(/^v/,"").split(".").map(Number); const cur=process.versions.node.split(".").map(Number); const ok=cur[0]>req[0] || (cur[0]===req[0] && (cur[1]>req[1] || (cur[1]===req[1] && cur[2]>=req[2]))); if(!ok){ console.error(`Node ${process.versions.node} does not satisfy ${process.argv[1]}.`); process.exit(1); }' "$required_node"
+    node -e 'const req=process.argv[1].trim().replace(/^v/,"").split(".").map((part)=>Number(part)); while(req.length<3) req.push(0); const cur=process.versions.node.split(".").map(Number); const ok=cur[0]>req[0] || (cur[0]===req[0] && (cur[1]>req[1] || (cur[1]===req[1] && cur[2]>=req[2]))); if(!ok){ console.error(`Node ${process.versions.node} does not satisfy ${process.argv[1]}.`); process.exit(1); }' "$required_node"
 
     git fetch origin main --tags
 
