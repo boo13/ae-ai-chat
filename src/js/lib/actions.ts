@@ -1,6 +1,7 @@
 export interface QuickAction {
   label: string;
-  icon: "screenshot" | "analysis" | "describe" | "fix-error" | "ai-action";
+  icon: "screenshot" | "report" | "fix-error" | "ai-action";
+  description: string;
   prompt?: string;
   handler?: string;
 }
@@ -9,27 +10,25 @@ export const quickActions: QuickAction[] = [
   {
     label: "Screenshot",
     icon: "screenshot",
+    description: "Capture the active comp frame.",
     handler: "takeScreenshot",
   },
   {
-    label: "Proj Report",
-    icon: "analysis",
+    label: "Report",
+    icon: "report",
+    description: "Analyze the comp for future prompts.",
     handler: "runAnalysis",
   },
   {
-    label: "Describe",
-    icon: "describe",
-    prompt:
-      "Describe the active composition's structure, layers, and expressions in detail.",
-  },
-  {
-    label: "Fix Last Error",
+    label: "Fix",
     icon: "fix-error",
+    description: "Diagnose the last panel or action error.",
     handler: "fixLastError",
   },
   {
     label: "AI Action",
     icon: "ai-action",
+    description: "Run the staged ExtendScript action.",
     handler: "runAiAction",
   },
 ];

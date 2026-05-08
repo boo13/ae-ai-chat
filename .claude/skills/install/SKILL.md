@@ -53,7 +53,7 @@ If the file exists, the build succeeded.
 Tell the user to:
 
 1. Restart After Effects.
-2. Open the panel from **Window → Extensions → AE AI Chat**.
+2. Open the panel from **Window → Extensions → AE AI Chat (dev)**. The `(dev)` suffix is added automatically by the build so this dev install coexists with the signed ZXP release (`AE AI Chat`) if you also have it installed.
 
 ## Step 5: Configure at least one provider
 

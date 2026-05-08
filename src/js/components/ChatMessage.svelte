@@ -4,19 +4,14 @@
   import { openLinkInBrowser } from "../lib/utils/bolt";
 
   interface Props {
-    assistantName: string;
     role: "user" | "assistant" | "system";
     content: string;
     timestamp: number;
     duration_ms?: number;
   }
 
-  let { assistantName, role, content, timestamp, duration_ms }: Props = $props();
+  let { role, content, timestamp, duration_ms }: Props = $props();
   let contentEl: HTMLDivElement | null = $state(null);
-
-  const roleLabel = $derived(
-    role === "user" ? "You" : role === "assistant" ? assistantName : "System"
-  );
 
   const timeStr = $derived.by(() => {
     const d = new Date(timestamp);
@@ -67,16 +62,15 @@
 </script>
 
 <div class="message message--{role}">
-  <div class="message__header">
-    <span class="message__role">{roleLabel}</span>
-    <span class="message__time">{timeStr}</span>
-  </div>
-  <div class="message__content" bind:this={contentEl}>
-    {#if role === "system"}
-      <p class="message__system-text">{content}</p>
-    {:else}
-      {@html renderedContent}
-    {/if}
+  <span class="message__time">{timeStr}</span>
+  <div class="message__bubble">
+    <div class="message__content" bind:this={contentEl}>
+      {#if role === "system"}
+        <p class="message__system-text">{content}</p>
+      {:else}
+        {@html renderedContent}
+      {/if}
+    </div>
   </div>
   {#if metaStr}
     <div class="message__meta">{metaStr}</div>
@@ -85,78 +79,80 @@
 
 <style>
   .message {
-    padding: 8px 12px;
-    margin-bottom: 4px;
-    border-radius: 4px;
-  }
-  .message--user {
-    background: #2a2a2a;
-  }
-  .message--assistant {
-    background: #1e1e1e;
-  }
-  .message--system {
-    background: transparent;
-  }
-  .message__header {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 4px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    padding: 6px 14px;
   }
-  .message__role {
-    font-weight: 600;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+
+  .message--user {
+    align-items: flex-end;
   }
-  .message--user .message__role {
-    color: #7cb3ff;
-  }
-  .message--assistant .message__role {
-    color: #a78bfa;
-  }
-  .message--system .message__role {
-    color: #888;
-  }
+
   .message__time {
-    font-size: 10px;
-    color: #666;
+    padding: 0 6px 2px;
+    color: var(--ae-text-3);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
   }
+
+  .message__bubble {
+    max-width: 84%;
+    padding: 9px 12px;
+    border: 1px solid var(--ae-line);
+    border-radius: 12px;
+    border-bottom-left-radius: 4px;
+    background: var(--ae-bg-2);
+  }
+
+  .message--user .message__bubble {
+    border-color: rgba(78,195,139,0.28);
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 12px;
+    background: rgba(78,195,139,0.22);
+  }
+
   .message__content {
-    font-size: 13px;
+    color: var(--ae-text);
+    font-size: 13.5px;
     line-height: 1.5;
-    color: #d4d4d4;
     overflow-wrap: break-word;
   }
+
   .message__content :global(pre) {
-    background: #161616;
+    background: rgba(0,0,0,0.28);
     padding: 8px;
     border-radius: 4px;
     overflow-x: auto;
     font-size: 12px;
     margin: 6px 0;
   }
+
   .message__content :global(code) {
     font-family: "SF Mono", "Menlo", monospace;
     font-size: 12px;
   }
+
   .message__content :global(p) {
     margin: 4px 0;
   }
+
   .message__content :global(a) {
-    color: #4a9eff;
+    color: var(--accent);
   }
+
   .message__system-text {
-    color: #888;
-    font-style: italic;
-    font-size: 12px;
+    color: var(--ae-text-2);
+    font-size: 12.5px;
     margin: 0;
     white-space: pre-wrap;
   }
+
   .message__meta {
+    padding: 0 6px;
+    color: var(--ae-text-3);
     font-size: 10px;
-    color: #555;
-    margin-top: 4px;
-    text-align: right;
+    font-variant-numeric: tabular-nums;
   }
 </style>

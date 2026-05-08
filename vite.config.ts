@@ -27,6 +27,17 @@ const isPackage = process.env.ZXP_PACKAGE === "true" || isMetaPackage;
 const isServe = process.env.SERVE_PANEL === "true";
 const action = process.env.BOLT_ACTION;
 
+// Suffix dev builds so they coexist with the packaged release in AE's
+// Window > Extensions menu. Done here (not in cep.config.ts) because that
+// file gets bundled into the panel, so process.env can't live there.
+if (!isPackage) {
+  cepConfig.id = `${cepConfig.id}.dev`;
+  cepConfig.displayName = `${cepConfig.displayName} (dev)`;
+  cepConfig.panels.forEach((panel) => {
+    panel.panelDisplayName = `${panel.panelDisplayName} (dev)`;
+  });
+}
+
 let input: { [key: string]: string } = {};
 cepConfig.panels.map((panel) => {
   input[panel.name] = path.resolve(root, panel.mainPath);

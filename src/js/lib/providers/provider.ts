@@ -3,6 +3,8 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   duration_ms?: number;
+  isError?: boolean;
+  diagnosticsRaw?: string;
 }
 
 export interface ProviderResult {

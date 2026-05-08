@@ -25,7 +25,7 @@ src/shared/     Shared types and constants (shared.ts)
 src/assets/     Icons
 ```
 
-Build tooling: `vite-cep-plugin`, `vite.config.ts` + `vite.es.config.ts`. Extension ID: `com.ae-ai-chat.panel`. Panel name: `AE AI Chat`.
+Build tooling: `vite-cep-plugin`, `vite.config.ts` + `vite.es.config.ts`. Dev extension ID: `com.ae-ai-chat.panel.dev` (menu: `AE AI Chat (dev)`). Prod/ZXP ID: `com.ae-ai-chat.panel` (menu: `AE AI Chat`). The `(dev)` suffix is applied in `vite.config.ts` at build time — `cep.config.ts` must stay static-literal only because it gets bundled into the panel JS (where `process.env` is undefined).
 
 ## Build and Dev Commands
 
@@ -38,7 +38,7 @@ pnpm zxp             # package a signed .zxp
 pnpm debug           # open panel preview in the browser
 ```
 
-Run `npm run build` before `npm run symlink`. After build + symlink, restart AE and open via **Window → Extensions → AE AI Chat**.
+Run `npm run build` before `npm run symlink`. After build + symlink, restart AE and open via **Window → Extensions → AE AI Chat (dev)**. The packaged ZXP release appears as **AE AI Chat** — both can coexist.
 
 ## AI Action Protocol
 

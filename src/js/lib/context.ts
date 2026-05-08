@@ -1,4 +1,5 @@
 import { evalTS } from "../lib/utils/bolt";
+import type { ContextChip } from "../../shared/shared";
 import { getKnowledgeContext } from "./knowledge/index";
 
 interface ProjectInfo {
@@ -77,6 +78,13 @@ export interface ChatContext {
   projectRoot?: string;
 }
 
+type CompChip = Extract<ContextChip, { type: "comp" }>;
+type LayerChip = Extract<ContextChip, { type: "layer" }>;
+type EffectChip = Extract<ContextChip, { type: "effect" }>;
+
+const COMP_CACHE_TTL_MS = 10000;
+const compListCache = new Map<"comps", { ts: number; items: CompChip[] }>();
+
 function formatSeconds(value: number): string {
   if (!Number.isFinite(value)) return "?s";
   const rounded = Math.abs(value - Math.round(value)) < 0.001 ? Math.round(value) : value;
@@ -85,6 +93,103 @@ function formatSeconds(value: number): string {
 
 function formatExpressionInline(expression: string): string {
   return expression.replace(/\s+/g, " ").trim();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function toStringField(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function toNumberField(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function formatPinnedContext(chip: ContextChip): string {
+  if (chip.type === "comp") {
+    return `comp: ${chip.label} (id:${chip.compId})`;
+  }
+
+  if (chip.type === "layer") {
+    return `layer: ${chip.label} (index:${chip.layerIndex} in ${chip.compName})`;
+  }
+
+  return `effect: ${chip.label} (matchName:${chip.matchName}, effectIndex:${chip.effectIndex}, on ${chip.layerName} layerIndex:${chip.layerIndex})`;
+}
+
+function buildPinnedContextBlock(pinnedContexts?: ContextChip[]): string[] {
+  if (!pinnedContexts?.length) return [];
+
+  return [
+    "<pinned-context>",
+    ...pinnedContexts.map(formatPinnedContext),
+    "</pinned-context>",
+  ];
+}
+
+export async function listProjectComps(): Promise<CompChip[]> {
+  const cached = compListCache.get("comps");
+  if (cached && Date.now() - cached.ts < COMP_CACHE_TTL_MS) {
+    return cached.items.slice();
+  }
+
+  const raw = await evalTS("getProjectCompsList");
+  const items = Array.isArray(raw)
+    ? raw
+        .filter(isRecord)
+        .map((r) => ({
+          type: "comp" as const,
+          label: toStringField(r.label),
+          compId: toStringField(r.compId),
+        }))
+        .filter((chip) => chip.label && chip.compId)
+    : [];
+
+  compListCache.set("comps", { ts: Date.now(), items });
+  return items.slice();
+}
+
+export async function listSelectedLayers(): Promise<LayerChip[]> {
+  const raw = await evalTS("getSelectedLayersList");
+  return Array.isArray(raw)
+    ? raw
+        .filter(isRecord)
+        .map((r) => ({
+          type: "layer" as const,
+          label: toStringField(r.label),
+          layerIndex: toNumberField(r.layerIndex),
+          compName: toStringField(r.compName),
+        }))
+        .filter((chip) => chip.label && chip.layerIndex > 0 && chip.compName)
+    : [];
+}
+
+export async function listEffectsOnSelectedLayer(): Promise<EffectChip[]> {
+  const raw = await evalTS("getEffectsOnSelectedLayer");
+  return Array.isArray(raw)
+    ? raw
+        .filter(isRecord)
+        .map((r) => ({
+          type: "effect" as const,
+          label: toStringField(r.label),
+          matchName: toStringField(r.matchName),
+          effectIndex: toNumberField(r.effectIndex),
+          layerIndex: toNumberField(r.layerIndex),
+          layerName: toStringField(r.layerName),
+        }))
+        .filter(
+          (chip) =>
+            chip.label &&
+            chip.matchName &&
+            chip.effectIndex > 0 &&
+            chip.layerIndex > 0 &&
+            chip.layerName
+        )
+    : [];
 }
 
 function buildSelectedLayerDetailsSection(details: SelectedLayerDetails | null): string[] {
@@ -172,7 +277,10 @@ function buildSelectedPropertiesSection(details: SelectedPropertyDetails | null)
   return lines;
 }
 
-export async function buildContext(userMessage?: string): Promise<ChatContext> {
+export async function buildContext(
+  userMessage?: string,
+  pinnedContexts?: ContextChip[]
+): Promise<ChatContext> {
   let projectInfo: ProjectInfo | null = null;
   let compInfo: CompInfo | null = null;
   let selectedLayerDetails: SelectedLayerDetails | null = null;
@@ -234,7 +342,18 @@ export async function buildContext(userMessage?: string): Promise<ChatContext> {
     // No selected property details available
   }
 
-  const lines: string[] = ["# AE Project Context"];
+  const pinnedContextBlock = buildPinnedContextBlock(pinnedContexts);
+  if (pinnedContextBlock.length > 0) {
+    console.log("[AE AI Chat] pinned context\n" + pinnedContextBlock.join("\n"));
+  }
+
+  const lines: string[] = [];
+  if (pinnedContextBlock.length > 0) {
+    lines.push(...pinnedContextBlock);
+    lines.push("");
+  }
+
+  lines.push("# AE Project Context");
 
   if (projectInfo) {
     const aeMeta: string[] = [];

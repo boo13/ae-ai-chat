@@ -27,10 +27,7 @@
   {#if name === "screenshot"}
     <path d="M14.5 4H9.5L7.8 6H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2.8z" />
     <circle cx="12" cy="12.5" r="3.25" />
-  {:else if name === "analysis"}
-    <circle cx="11" cy="11" r="6.5" />
-    <path d="m16 16 4 4" />
-  {:else if name === "describe"}
+  {:else if name === "report"}
     <path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z" />
     <path d="M14 2v5h5" />
     <path d="M9 12h6" />

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AE AI Chat — Redesign</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --ae-bg: #1c1c1c;
+    --ae-bg-2: #232323;
+    --ae-bg-3: #2a2a2a;
+    --ae-line: rgba(255,255,255,0.06);
+    --ae-line-2: rgba(255,255,255,0.10);
+    --ae-text: #e6e6e6;
+    --ae-text-2: #a0a0a0;
+    --ae-text-3: #6e6e6e;
+    --ae-accent: #6aa3ff;
+    --ae-accent-deep: #3a7df0;
+    --ae-warn: #ff8e6a;
+    --ae-ok: #4ec38b;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0e0e0e;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    color: var(--ae-text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    box-sizing: border-box;
+  }
+  /* Subtle vignette backdrop */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(60% 50% at 50% 30%, rgba(106,163,255,0.05), transparent 60%),
+      radial-gradient(40% 40% at 80% 90%, rgba(255,255,255,0.02), transparent 70%);
+    pointer-events: none;
+  }
+  #root { position: relative; z-index: 1; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

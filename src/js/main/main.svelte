@@ -16,7 +16,10 @@
   import ChatMessageComponent from "../components/ChatMessage.svelte";
   import ChatInput from "../components/ChatInput.svelte";
   import ActionBar from "../components/ActionBar.svelte";
-  import StatusBar from "../components/StatusBar.svelte";
+  import ErrorBlock from "../components/ErrorBlock.svelte";
+  import PanelHeader from "../components/PanelHeader.svelte";
+  import StreamingRow from "../components/StreamingRow.svelte";
+  import Suggestions from "../components/Suggestions.svelte";
   import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
   import { buildAutoFixPrompt } from "../lib/auto-fix";
   import { getRuntimeEnvironment } from "../lib/runtime-environment";
@@ -26,6 +29,7 @@
     ProviderDefinition,
     ProviderStatusUpdate,
   } from "../lib/providers/provider";
+  import type { ContextChip } from "../../shared/shared";
   import { version } from "../../../package.json";
 
   const runtimeEnvironment = getRuntimeEnvironment();
@@ -47,10 +51,12 @@
   let pendingScreenshot: { path: string; fileName: string } | null = $state(null);
   let sessionProjectRoot: string | undefined = $state();
   let didInitializeAiAction: boolean = $state(false);
+  let aiActionReady: boolean = $state(false);
   let aiActionWarnings: ScriptValidationWarning[] = $state([]);
   let aiActionErrors: ScriptValidationError[] = $state([]);
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
+  let pendingContexts: ContextChip[] = $state([]);
   let statusClearTimer: ReturnType<typeof setTimeout> | null = null;
   let statusElapsedTimer: ReturnType<typeof setInterval> | null = null;
   let statusElapsedMs: number = $state(0);
@@ -60,23 +66,6 @@
   let autoFixOriginalPrompt: string = $state("");
   let autoFixAborted: boolean = $state(false);
   const AUTO_FIX_MAX = 3;
-
-  function getProviderHeaderTitle(provider: ProviderDefinition | null): string {
-    if (!provider) return "AE AI Chat";
-
-    switch (provider.id) {
-      case "claude":
-        return "Claude";
-      case "claude-api":
-        return "Claude API";
-      case "codex":
-        return "Codex";
-      default:
-        return provider.displayName;
-    }
-  }
-
-  const activeHeaderTitle = $derived.by(() => getProviderHeaderTitle(activeProvider));
 
   function cancelStatusClear() {
     if (statusClearTimer) {
@@ -128,7 +117,7 @@
   function addMessage(
     role: ChatMessage["role"],
     content: string,
-    extra?: { duration_ms?: number }
+    extra?: { duration_ms?: number; isError?: boolean; diagnosticsRaw?: string }
   ): number {
     messages.push({
       role,
@@ -138,6 +127,13 @@
     });
     scrollToBottom();
     return messages.length - 1;
+  }
+
+  function formatMessageTime(timestamp: number): string {
+    const d = new Date(timestamp);
+    const h = d.getHours().toString().padStart(2, "0");
+    const m = d.getMinutes().toString().padStart(2, "0");
+    return `${h}:${m}`;
   }
 
   function appendToMessage(index: number, chunk: string) {
@@ -212,23 +208,62 @@
     messages = [];
     rememberError("");
     pendingScreenshot = null;
+    aiActionReady = false;
     setAiActionWarnings([]);
     setStatus(null);
     autoFixAttempt = 0;
     autoFixOriginalPrompt = "";
     autoFixAborted = false;
+    pendingContexts = [];
     addMessage(
       "system",
       provider.displayName + " ready. Ask about your After Effects project."
     );
   }
 
+  function contextKey(ctx: ContextChip): string {
+    if (ctx.type === "comp") {
+      return "comp:" + ctx.compId;
+    }
+
+    if (ctx.type === "layer") {
+      return "layer:" + ctx.compName + ":" + ctx.layerIndex;
+    }
+
+    return (
+      "effect:" +
+      ctx.layerIndex +
+      ":" +
+      ctx.layerName +
+      ":" +
+      ctx.matchName +
+      ":" +
+      ctx.effectIndex
+    );
+  }
+
+  function handleContextAdd(chip: ContextChip) {
+    const key = contextKey(chip);
+    if (pendingContexts.some((ctx) => contextKey(ctx) === key)) return;
+    pendingContexts = [...pendingContexts, chip];
+  }
+
+  function handleContextRemove(index: number) {
+    pendingContexts = pendingContexts.filter((_, i) => i !== index);
+  }
+
   async function handleUserSend(text: string) {
+    const ctxs = pendingContexts.slice();
+    pendingContexts = [];
+    await handlePromptSend(text, ctxs);
+  }
+
+  async function handlePromptSend(text: string, pinned?: ContextChip[]) {
     autoFixAttempt = 0;
     autoFixOriginalPrompt = text;
     autoFixAborted = false;
     rememberError("");
-    await handleSend(text);
+    await handleSend(text, false, pinned);
   }
 
   async function scrollToBottom() {
@@ -238,7 +273,7 @@
     }
   }
 
-  async function handleSend(text: string, isAutoFix = false) {
+  async function handleSend(text: string, isAutoFix = false, pinned?: ContextChip[]) {
     if (!activeProvider) return;
 
     setAiActionWarnings([]);
@@ -257,20 +292,23 @@
 
     // Index of the streaming assistant message slot (-1 = not yet created)
     let streamingIdx = -1;
+    let providerCallInFlight = false;
 
     try {
       setStatus({
         phase: "preparing",
         text: "Reading AE context...",
       });
-      const context = await buildContext(text);
+      const context = await buildContext(text, pinned);
       sessionProjectRoot = context.projectRoot || sessionProjectRoot;
 
       if (!didInitializeAiAction && sessionProjectRoot) {
         clearAiAction(sessionProjectRoot);
+        aiActionReady = false;
         didInitializeAiAction = true;
       }
 
+      providerCallInFlight = true;
       const result = await activeProvider.sendMessage(
         text,
         {
@@ -293,12 +331,14 @@
         },
         history
       );
+      providerCallInFlight = false;
 
       if (result.sessionId) {
         sessionId = result.sessionId;
       }
 
       if (result.is_error) {
+        const isProviderError = result.is_error && !result.cancelled;
         // Remove the partial streaming message if we got an error
         if (streamingIdx !== -1) {
           messages.splice(streamingIdx, 1);
@@ -306,6 +346,8 @@
         }
         addMessage("system", result.result, {
           duration_ms: result.duration_ms,
+          isError: isProviderError,
+          diagnosticsRaw: isProviderError ? activeStatus?.raw : undefined,
         });
         if (!result.cancelled) rememberError(result.result);
       } else {
@@ -339,6 +381,7 @@
           addMessage("system", "AI Action ready: " + saved.summary);
 
           if (validationErrors.length > 0) {
+            aiActionReady = false;
             aiActionErrors = validationErrors;
             addMessage(
               "system",
@@ -359,6 +402,7 @@
               validationErrors
             );
           } else {
+            aiActionReady = true;
             if (warnings.length > 0) {
               addMessage(
                 "system",
@@ -461,6 +505,8 @@
       }
     } catch (err: any) {
       const errMsg = err?.message || String(err);
+      const isProviderRuntimeError = providerCallInFlight;
+      providerCallInFlight = false;
       if (streamingIdx !== -1) {
         messages.splice(streamingIdx, 1);
       }
@@ -470,7 +516,10 @@
         raw: errMsg,
         terminal: true,
       });
-      addMessage("system", "Error: " + errMsg);
+      addMessage("system", "Error: " + errMsg, {
+        isError: isProviderRuntimeError,
+        diagnosticsRaw: isProviderRuntimeError ? activeStatus?.raw : undefined,
+      });
       rememberError(errMsg);
     } finally {
       isLoading = false;
@@ -517,22 +566,22 @@
     }
 
     if (action.handler === "runAnalysis") {
-      addMessage("system", "Running analysis...");
+      addMessage("system", "Building report...");
       isLoading = true;
       try {
         const result = await evalTS("runAnalysisScript");
         if (result && "error" in result && result.error) {
-          addMessage("system", "Analysis error: " + result.error);
+          addMessage("system", "Report error: " + result.error);
           rememberError(String(result.error));
         } else {
           addMessage(
             "system",
-            "Analysis complete. Context updated for next message."
+            "Report complete. Context updated for next message."
           );
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
-        addMessage("system", "Analysis failed: " + errMsg);
+        addMessage("system", "Report failed: " + errMsg);
         rememberError(errMsg);
       } finally {
         isLoading = false;
@@ -558,7 +607,7 @@
         prompt += "\n\nHint: " + hint;
       }
 
-      await handleUserSend(prompt);
+      await handlePromptSend(prompt);
       return;
     }
 
@@ -602,7 +651,7 @@
     }
 
     if (action.prompt) {
-      await handleUserSend(action.prompt);
+      await handlePromptSend(action.prompt);
     }
   }
 
@@ -627,6 +676,7 @@
         sessionProjectRoot = context.projectRoot || sessionProjectRoot;
         if (!didInitializeAiAction && context.projectRoot) {
           clearAiAction(context.projectRoot);
+          aiActionReady = false;
           didInitializeAiAction = true;
         }
       })
@@ -647,33 +697,44 @@
   <ProviderPicker onSelect={handleProviderSelect} />
 {:else}
   <div class="app">
-    <header class="header">
-      <span class="header__title">
-        <span class="header__provider">{activeHeaderTitle}</span>
-        <span class="header__version">v{version}</span>
-        {#if runtimeEnvironment.isDevInstall}
-          <span class="header__build-badge" title={runtimeEnvironmentTitle}>DEV</span>
-        {/if}
-      </span>
-      <div class="header__controls">
-        <select class="model-select" bind:value={model}>
-          {#each activeProvider.models as providerModel}
-            <option value={providerModel.value}>{providerModel.label}</option>
-          {/each}
-        </select>
-      </div>
-    </header>
+    <PanelHeader
+      {activeProvider}
+      {runtimeEnvironment}
+      {runtimeEnvironmentTitle}
+      {version}
+      {model}
+      onModelChange={(value) => (model = value)}
+    />
 
     <div class="chat-area" bind:this={chatArea} data-select-scope="chat-history">
       {#each messages as msg}
-        <ChatMessageComponent
-          assistantName={activeProvider.displayName}
-          role={msg.role}
-          content={msg.content}
-          timestamp={msg.timestamp}
-          duration_ms={msg.duration_ms}
-        />
+        {#if msg.isError}
+          <ErrorBlock
+            time={formatMessageTime(msg.timestamp)}
+            content={msg.content}
+            diagnosticsRaw={msg.diagnosticsRaw}
+            providerName={activeProvider.displayName}
+          />
+        {:else}
+          <ChatMessageComponent
+            role={msg.role}
+            content={msg.content}
+            timestamp={msg.timestamp}
+            duration_ms={msg.duration_ms}
+          />
+        {/if}
       {/each}
+
+      {#if isLoading}
+        <StreamingRow
+          providerName={activeProvider.displayName}
+          elapsedMs={statusElapsedMs}
+        />
+      {/if}
+
+      {#if messages.length === 1 && messages[0]?.role === "system" && !messages[0]?.isError && !isLoading}
+        <Suggestions onpick={handleUserSend} />
+      {/if}
     </div>
 
     {#if pendingScreenshot}
@@ -709,190 +770,173 @@
       </div>
     {/if}
 
-    {#if activeStatus}
-      <StatusBar
-        providerName={activeProvider.displayName}
-        status={activeStatus}
-        elapsedMs={statusElapsedMs}
-      />
-    {/if}
-
+    <ChatInput
+      disabled={isLoading}
+      contexts={pendingContexts}
+      onsubmit={handleUserSend}
+      oncancel={activeAbortController ? handleCancel : undefined}
+      onContextAdd={handleContextAdd}
+      onContextRemove={handleContextRemove}
+    />
     <ActionBar
       disabled={isLoading}
       supportsImages={activeProvider.supportsImages}
+      hasError={Boolean(lastError)}
+      {aiActionReady}
+      aiActionBlocked={aiActionErrors.length > 0}
       onclick={handleAction}
-    />
-    <ChatInput
-      assistantName={activeProvider.displayName}
-      disabled={isLoading}
-      onsubmit={handleUserSend}
-      oncancel={activeAbortController ? handleCancel : undefined}
     />
   </div>
 {/if}
 
 <style>
+  :global(:root) {
+    --ae-bg: #1c1c1c;
+    --ae-bg-2: #232323;
+    --ae-bg-3: #2a2a2a;
+    --ae-line: rgba(255,255,255,0.06);
+    --ae-line-2: rgba(255,255,255,0.10);
+    --ae-text: #e6e6e6;
+    --ae-text-2: #a0a0a0;
+    --ae-text-3: #6e6e6e;
+    --accent: #4ec38b;
+    --ae-accent-deep: #3a7df0;
+    --ae-warn: #ff8e6a;
+    --ae-ok: #4ec38b;
+  }
+
   :global(body) {
     margin: 0;
     padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
       sans-serif;
-    background: #232323;
-    color: #d4d4d4;
+    background: var(--ae-bg);
+    color: var(--ae-text);
     overflow: hidden;
   }
+
   :global(*) {
     box-sizing: border-box;
   }
+
   .app {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background: #232323;
+    background: var(--ae-bg);
+    color: var(--ae-text);
   }
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: #1a1a1a;
-    border-bottom: 1px solid #333;
-    flex-shrink: 0;
-  }
-  .header__title {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-    font-size: 13px;
-    font-weight: 600;
-    color: #eee;
-  }
-  .header__provider {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .header__version {
-    font-size: 10px;
-    font-weight: 400;
-    color: #666;
-    margin-left: 5px;
-  }
-  .header__build-badge {
-    margin-left: 6px;
-    padding: 1px 5px;
-    border: 1px solid #8b5f20;
-    border-radius: 4px;
-    color: #ffc767;
-    background: #2e2111;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 14px;
-    letter-spacing: 0;
-  }
-  .header__controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .model-select {
-    background: #2a2a2a;
-    border: 1px solid #444;
-    border-radius: 4px;
-    color: #ccc;
-    padding: 3px 6px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .model-select:focus {
-    outline: none;
-    border-color: #4a9eff;
-  }
+
   .chat-area {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    padding: 8px 0;
+    padding: 4px 0 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.12) transparent;
   }
+
   .chat-area::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
   }
+
   .chat-area::-webkit-scrollbar-track {
     background: transparent;
   }
+
   .chat-area::-webkit-scrollbar-thumb {
-    background: #444;
-    border-radius: 3px;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.12);
+    background-clip: content-box;
   }
+
+  .chat-area::-webkit-scrollbar-thumb:hover {
+    border: 2px solid transparent;
+    background: rgba(255,255,255,0.20);
+    background-clip: content-box;
+  }
+
   .pending-screenshot {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 4px 12px;
-    background: #2a2a2a;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--ae-line);
+    background: var(--ae-bg-2);
+    color: var(--accent);
     font-size: 11px;
-    color: #4a9eff;
   }
+
   .pending-screenshot__clear {
     background: none;
     border: none;
-    color: #888;
+    color: var(--ae-text-3);
     cursor: pointer;
     font-size: 11px;
     padding: 0;
   }
+
   .pending-screenshot__clear:hover {
-    color: #eee;
+    color: var(--ae-text);
   }
+
   .validation-banner {
     margin: 8px 12px 0;
     padding: 10px 12px;
-    border: 1px solid #8a5a1d;
-    border-radius: 6px;
-    background: #2b2114;
-    color: #f2d3a2;
+    border: 1px solid rgba(255,142,106,0.32);
+    border-radius: 8px;
+    background: rgba(255,142,106,0.08);
+    color: rgb(242,211,162);
   }
+
   .validation-banner__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 6px;
   }
+
   .validation-banner__title {
     font-size: 12px;
     font-weight: 600;
   }
+
   .validation-banner__close {
     background: none;
     border: none;
-    color: #c6a46c;
+    color: rgba(242,211,162,0.70);
     cursor: pointer;
     font-size: 14px;
     line-height: 1;
     padding: 0 2px;
   }
+
   .validation-banner__close:hover {
-    color: #f2d3a2;
+    color: rgb(242,211,162);
   }
+
   .validation-banner__list {
     margin: 0;
     padding-left: 18px;
   }
+
   .validation-banner__list li {
     margin: 0 0 6px;
     font-size: 12px;
     line-height: 1.4;
   }
+
   .validation-banner__meta {
-    color: #c6a46c;
+    color: rgba(242,211,162,0.72);
     margin-left: 6px;
     font-family: "SF Mono", "Menlo", monospace;
     font-size: 11px;
   }
+
   .validation-banner__hint {
     font-size: 11px;
-    color: #d8ba86;
+    color: rgba(242,211,162,0.82);
     margin-top: 6px;
   }
 </style>

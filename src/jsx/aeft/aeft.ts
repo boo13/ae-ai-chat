@@ -464,6 +464,82 @@ export const getActiveCompInfo = () => {
   };
 };
 
+export function getProjectCompsList(): { label: string; compId: string }[] {
+  var result: { label: string; compId: string }[] = [];
+
+  for (var i = 1; i <= app.project.numItems; i++) {
+    var item = app.project.item(i);
+    if (item instanceof CompItem) {
+      result.push({
+        label: item.name,
+        compId: String(item.id),
+      });
+    }
+  }
+
+  return result;
+}
+
+export function getSelectedLayersList(): { label: string; layerIndex: number; compName: string }[] {
+  var result: { label: string; layerIndex: number; compName: string }[] = [];
+  var comp = app.project.activeItem;
+  if (!comp || !(comp instanceof CompItem)) return result;
+
+  for (var i = 1; i <= comp.numLayers; i++) {
+    var layer = comp.layer(i);
+    if (layer.selected) {
+      result.push({
+        label: layer.name,
+        layerIndex: i,
+        compName: comp.name,
+      });
+    }
+  }
+
+  return result;
+}
+
+export function getEffectsOnSelectedLayer(): {
+  label: string;
+  matchName: string;
+  effectIndex: number;
+  layerIndex: number;
+  layerName: string;
+}[] {
+  var result: {
+    label: string;
+    matchName: string;
+    effectIndex: number;
+    layerIndex: number;
+    layerName: string;
+  }[] = [];
+  var comp = app.project.activeItem;
+  if (!comp || !(comp instanceof CompItem)) return result;
+
+  for (var i = 1; i <= comp.numLayers; i++) {
+    var layer = comp.layer(i);
+    if (!layer.selected) continue;
+
+    var effects = layer.property("ADBE Effect Parade");
+    if (!effects) continue;
+
+    for (var j = 1; j <= effects.numProperties; j++) {
+      var fx = effects.property(j);
+      if (!fx) continue;
+
+      result.push({
+        label: fx.name,
+        matchName: fx.matchName,
+        effectIndex: j,
+        layerIndex: i,
+        layerName: layer.name,
+      });
+    }
+  }
+
+  return result;
+}
+
 export const getSelectedLayerDetails = () => {
   var comp = getActiveComp();
   if (!comp) {

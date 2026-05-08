@@ -43,7 +43,7 @@ pnpm install
 pnpm build
 ```
 
-Then restart After Effects and open the panel from **Window > Extensions > AE AI Chat**.
+Then restart After Effects and open the panel from **Window > Extensions > AE AI Chat (dev)**. (The signed ZXP release appears as **AE AI Chat** — both can coexist in the menu.)
 
 ## Scripts
 
@@ -86,15 +86,14 @@ Quick actions:
   - Captures the current comp frame
   - Saves it under `screenshots/` next to the current `.aep` project
   - Only appears for providers that support image attachments
-- `Run Analysis`
+- `Report`
   - Runs a deeper comp analysis inside After Effects
   - Caches a richer summary including effects and expressions for later prompts
-- `Describe`
-  - Sends a prompt asking the active provider to describe the current composition
-- `Fix Last Error`
+- `Fix`
   - Sends the most recent panel or action error back to the provider for diagnosis
 - `AI Action`
   - Re-runs the current temporary AI-generated ExtendScript action
+  - Disabled until an action has been staged
 
 ## AI Action Protocol
 
