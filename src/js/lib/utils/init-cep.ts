@@ -1,4 +1,5 @@
 import { company, displayName, version } from "../../../shared/shared";
+import { getRuntimeEnvironment } from "../runtime-environment";
 import {
   copySelectionInPanelScope,
   keyRegisterOverride,
@@ -8,8 +9,16 @@ import {
 } from "./cep";
 
 const buildFlyoutMenu = () => {
+  const runtimeEnvironment = getRuntimeEnvironment();
+  const buildLabel = runtimeEnvironment.isDevInstall
+    ? `${displayName} ${version} DEV`
+    : `${displayName} ${version}`;
+  const devInstallItem = runtimeEnvironment.isDevInstall
+    ? `<MenuItem Id="dev-install" Label="${runtimeEnvironment.reason}" Enabled="false" Checked="false"/>`
+    : "";
   const menu = `<Menu>
-  <MenuItem Id="info" Label="${displayName} ${version}" Enabled="false" Checked="false"/>
+  <MenuItem Id="info" Label="${buildLabel}" Enabled="false" Checked="false"/>
+  ${devInstallItem}
   <MenuItem Id="website" Label="by ${company}" Enabled="false" Checked="false"/>
   <MenuItem Label="---" />
   <MenuItem Id="refresh" Label="Refresh" Enabled="true" Checked="false"/>

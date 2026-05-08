@@ -19,6 +19,7 @@
   import StatusBar from "../components/StatusBar.svelte";
   import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
   import { buildAutoFixPrompt } from "../lib/auto-fix";
+  import { getRuntimeEnvironment } from "../lib/runtime-environment";
   import type { ExpressionError } from "../lib/auto-fix";
   import type {
     ChatMessage,
@@ -26,6 +27,14 @@
     ProviderStatusUpdate,
   } from "../lib/providers/provider";
   import { version } from "../../../package.json";
+
+  const runtimeEnvironment = getRuntimeEnvironment();
+  const runtimeEnvironmentTitle = (() => {
+    const installPath = runtimeEnvironment.realExtensionPath || runtimeEnvironment.extensionPath;
+    return installPath
+      ? runtimeEnvironment.reason + ": " + installPath
+      : runtimeEnvironment.reason;
+  })();
 
   let messages: ChatMessage[] = $state([]);
   let isLoading: boolean = $state(false);
@@ -639,7 +648,13 @@
 {:else}
   <div class="app">
     <header class="header">
-      <span class="header__title">{activeHeaderTitle}<span class="header__version">v{version}</span></span>
+      <span class="header__title">
+        <span class="header__provider">{activeHeaderTitle}</span>
+        <span class="header__version">v{version}</span>
+        {#if runtimeEnvironment.isDevInstall}
+          <span class="header__build-badge" title={runtimeEnvironmentTitle}>DEV</span>
+        {/if}
+      </span>
       <div class="header__controls">
         <select class="model-select" bind:value={model}>
           {#each activeProvider.models as providerModel}
@@ -745,15 +760,36 @@
     flex-shrink: 0;
   }
   .header__title {
+    display: flex;
+    align-items: center;
+    min-width: 0;
     font-size: 13px;
     font-weight: 600;
     color: #eee;
+  }
+  .header__provider {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .header__version {
     font-size: 10px;
     font-weight: 400;
     color: #666;
     margin-left: 5px;
+  }
+  .header__build-badge {
+    margin-left: 6px;
+    padding: 1px 5px;
+    border: 1px solid #8b5f20;
+    border-radius: 4px;
+    color: #ffc767;
+    background: #2e2111;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 14px;
+    letter-spacing: 0;
   }
   .header__controls {
     display: flex;
