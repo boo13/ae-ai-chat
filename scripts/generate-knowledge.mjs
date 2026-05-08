@@ -32,6 +32,7 @@ if (!existsSync(sourcePath)) {
 }
 
 const effectsDir = join(sourcePath, "effects");
+const examplesDir = join(sourcePath, "examples");
 const gotchasFile = join(sourcePath, "gotchas.md");
 const propertiesDir = join(sourcePath, "properties");
 const outputDir = resolve(__dirname, "..", "src", "js", "lib", "knowledge", "data");
@@ -145,6 +146,95 @@ function formatLayerPropertySections(sections) {
   }
 
   return lines.join("\n");
+}
+
+function failInvalidExample(file, message) {
+  console.error(`Error: Invalid example ${file}: ${message}`);
+  process.exit(1);
+}
+
+function validateExample(file, example) {
+  if (!example || typeof example !== "object" || Array.isArray(example)) {
+    failInvalidExample(file, "expected a JSON object");
+  }
+
+  for (const field of ["id", "description", "script"]) {
+    if (typeof example[field] !== "string" || example[field].trim() === "") {
+      failInvalidExample(file, `${field} must be a non-empty string`);
+    }
+  }
+
+  if (!Array.isArray(example.keywords) || example.keywords.length === 0) {
+    failInvalidExample(file, "keywords must be a non-empty array");
+  }
+
+  for (const keyword of example.keywords) {
+    if (typeof keyword !== "string" || keyword.trim() === "") {
+      failInvalidExample(file, "keywords must contain only non-empty strings");
+    }
+
+    if (keyword !== keyword.toLowerCase()) {
+      failInvalidExample(file, `keyword "${keyword}" must be lowercase`);
+    }
+  }
+
+  if (example.notes !== undefined && typeof example.notes !== "string") {
+    failInvalidExample(file, "notes must be a string when present");
+  }
+
+  const validated = {
+    id: example.id,
+    description: example.description,
+    keywords: example.keywords,
+    script: example.script,
+  };
+
+  if (example.notes) {
+    validated.notes = example.notes;
+  }
+
+  return validated;
+}
+
+function readExamples() {
+  if (!existsSync(examplesDir)) {
+    console.warn(
+      `Warning: Missing optional corpus directory ${examplesDir}; generating empty examples catalog.`
+    );
+    return [];
+  }
+
+  const files = readdirSync(examplesDir)
+    .filter((file) => file.endsWith(".json") && !file.startsWith("_"))
+    .sort();
+
+  const examples = [];
+  const seenIds = new Set();
+
+  for (const file of files) {
+    const filePath = join(examplesDir, file);
+
+    try {
+      const raw = readFileSync(filePath, "utf-8");
+      const example = JSON.parse(raw);
+      const validated = validateExample(file, example);
+
+      if (seenIds.has(validated.id)) {
+        failInvalidExample(file, `duplicate id "${validated.id}"`);
+      }
+
+      seenIds.add(validated.id);
+      examples.push(validated);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        failInvalidExample(file, "could not parse JSON");
+      }
+
+      throw error;
+    }
+  }
+
+  return examples;
 }
 
 // -- Generate effect index ---------------------------------------------------
@@ -330,5 +420,26 @@ export const LAYER_PROPERTIES = ${JSON.stringify(combinedLayerProperties)};
 console.log(
   `✓ layer-properties.ts — ${combinedLayerProperties ? combinedLayerProperties.split("\n").length : 0} lines`
 );
+
+// -- Generate examples -------------------------------------------------------
+
+const examples = readExamples();
+
+writeObjectModule(
+  "examples.ts",
+  `ae-ai-starter/Scripts/verified/examples/ (${examples.length} examples)`,
+  `export interface ExampleEntry {
+  id: string;
+  description: string;
+  keywords: string[];
+  script: string;
+  notes?: string;
+}
+
+export const EXAMPLES: ExampleEntry[] = ${JSON.stringify(examples, null, 2)};
+`
+);
+
+console.log(`✓ examples.ts — ${examples.length} examples`);
 
 console.log("\nDone. Files written to src/js/lib/knowledge/data/");

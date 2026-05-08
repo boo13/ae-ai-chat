@@ -1,58 +1,55 @@
+import { EXAMPLES, type ExampleEntry } from "./data/examples";
 import type { KnowledgeSource } from "./types";
 
-const EXAMPLES_CONTEXT = `## AI Action Examples
+const MAX_EXAMPLES = 2;
 
-### Example 1 — Correct script (Drop Shadow + expression)
+const patterns: Array<{ regex: RegExp; example: ExampleEntry }> = [];
+for (const example of EXAMPLES) {
+  for (const keyword of example.keywords) {
+    const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    patterns.push({
+      regex: new RegExp("\\b" + escaped + "\\b", "i"),
+      example,
+    });
+  }
+}
 
-User: Add a Drop Shadow to the selected layer with Distance 12 and pin Opacity to wiggle.
+function formatExample(example: ExampleEntry): string {
+  const lines = [
+    "### " + example.description,
+    "```jsx",
+    example.script,
+    "```",
+  ];
 
-\`\`\`
-<ai-action run="true">
-app.beginUndoGroup("Add Drop Shadow");
-var comp = app.project.activeItem;
-var layer = comp.selectedLayers[0];
-var effects = layer.property("ADBE Effect Parade");
-var shadow = effects.addProperty("ADBE Drop Shadow");
-shadow.property("ADBE Drop Shadow-0003").setValue(12);
-shadow.property("ADBE Drop Shadow-0005").setValue([0, 0, 0, 0.75]);
-var opacityProp = layer.property("ADBE Transform Group").property("ADBE Opacity");
-opacityProp.expression = "wiggle(2, 20) + 60";
-app.endUndoGroup();
-</ai-action>
-\`\`\`
+  if (example.notes) {
+    lines.push("Note: " + example.notes);
+  }
 
-### Example 2 — Common mistakes and their corrections
-
-BAD (validator will block this):
-\`\`\`
-// ES3 violations: let, const, arrow, template literal
-const layer = comp.selectedLayers[0];
-let effects = layer.property("ADBE Effect Parade");
-const addEffect = (name) => effects.addProperty(name);
-addEffect(\`ADBE Glow\`);
-\`\`\`
-
-CORRECTED:
-\`\`\`
-// ES3: var only, function keyword, string concatenation
-var layer = comp.selectedLayers[0];
-var effects = layer.property("ADBE Effect Parade");
-effects.addProperty("ADBE Glow");
-\`\`\`
-
-BAD expression (expressionError will be reported):
-\`\`\`
-opacityProp.expression = "wggl(2, 30)";   // typo — wggl is undefined
-\`\`\`
-
-CORRECTED:
-\`\`\`
-opacityProp.expression = "wiggle(2, 30)";
-\`\`\``;
+  return lines.join("\n");
+}
 
 export const examplesKnowledge: KnowledgeSource = {
   id: "examples",
   getStaticContext() {
-    return EXAMPLES_CONTEXT;
+    return "";
+  },
+  getMessageContext(userMessage: string) {
+    const matched: ExampleEntry[] = [];
+    const matchedIds = new Set<string>();
+
+    for (const pattern of patterns) {
+      if (matchedIds.has(pattern.example.id)) continue;
+      if (!pattern.regex.test(userMessage)) continue;
+
+      matched.push(pattern.example);
+      matchedIds.add(pattern.example.id);
+
+      if (matched.length === MAX_EXAMPLES) break;
+    }
+
+    if (matched.length === 0) return "";
+
+    return ["## Verified Working Examples", ...matched.map(formatExample)].join("\n\n");
   },
 };

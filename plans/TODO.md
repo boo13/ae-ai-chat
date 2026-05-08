@@ -11,7 +11,7 @@ Design source: `plans/ae-ai-chat-design/` (handoff from Claude Design).
 - [x] See `plans/redesign-phase-2-context-chips.md`
 
 ## Implement Fourth Plan
-- [ ] Implement `plans/few-shot-examples.md`
+- [x] Implement `plans/few-shot-examples.md`
 
 ## Provider Selection UX
 - [x] Add an in-panel way to switch providers after initial selection.
