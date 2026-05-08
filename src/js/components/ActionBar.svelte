@@ -79,7 +79,7 @@
 <style>
   .action-drawer {
     flex-shrink: 0;
-    background: rgb(14,14,14);
+    background: var(--ae-chrome-bg);
     box-shadow:
       inset 0 8px 10px -8px rgba(0,0,0,0.7),
       inset 0 1px 0 rgba(255,255,255,0.02);

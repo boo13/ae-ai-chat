@@ -8,6 +8,16 @@ A CEP panel for Adobe After Effects that lets you chat with AI providers directl
 
 Signed `.zxp` builds are attached to GitHub Releases. Install them with [ZXP Installer](https://aescripts.com/learn/zxp-installer/).
 
+To start a new release from a clean, up-to-date `main` branch:
+
+```bash
+just release 0.1.2
+# or bump the patch version automatically:
+just release-bump
+```
+
+`just release-bump` increments the patch version from `package.json`, for example `0.1.2` to `0.1.3`. Both release commands bump `package.json`, commit `Release v0.1.2`, create the `v0.1.2` tag, and push the branch and tag. The pushed tag starts the `Release ZXP` GitHub Actions workflow, which typechecks, signs the ZXP with `ZXP_CERT_PASSWORD`, and uploads it to the GitHub Release.
+
 ## Architecture
 
 - CEP panel running inside After Effects with Chromium + Node.js enabled

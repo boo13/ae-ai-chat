@@ -703,7 +703,9 @@
       {runtimeEnvironmentTitle}
       {version}
       {model}
+      disabled={isLoading}
       onModelChange={(value) => (model = value)}
+      onProviderChange={handleProviderSelect}
     />
 
     <div class="chat-area" bind:this={chatArea} data-select-scope="chat-history">
@@ -772,6 +774,7 @@
 
     <ChatInput
       disabled={isLoading}
+      providerName={activeProvider.displayName}
       contexts={pendingContexts}
       onsubmit={handleUserSend}
       oncancel={activeAbortController ? handleCancel : undefined}
@@ -794,6 +797,7 @@
     --ae-bg: #1c1c1c;
     --ae-bg-2: #232323;
     --ae-bg-3: #2a2a2a;
+    --ae-chrome-bg: rgb(14,14,14);
     --ae-line: rgba(255,255,255,0.06);
     --ae-line-2: rgba(255,255,255,0.10);
     --ae-text: #e6e6e6;

@@ -5,6 +5,7 @@
 
   interface Props {
     disabled: boolean;
+    providerName: string;
     onsubmit: (text: string) => void;
     oncancel?: () => void;
     contexts: ContextChip[];
@@ -14,6 +15,7 @@
 
   let {
     disabled,
+    providerName,
     onsubmit,
     oncancel,
     contexts,
@@ -26,6 +28,11 @@
   let contextMenuEl: HTMLDivElement | undefined = $state();
 
   const isStreaming = $derived(disabled && Boolean(oncancel));
+  const placeholder = $derived(
+    isStreaming
+      ? providerName + " is responding..."
+      : "Ask " + providerName + " about your AE project..."
+  );
 
   function contextKey(ctx: ContextChip): string {
     if (ctx.type === "comp") {
@@ -105,7 +112,7 @@
       bind:value={text}
       onkeydown={handleKeydown}
       oninput={autoResize}
-      placeholder={isStreaming ? "Claude is responding..." : "Ask Claude about your AE project..."}
+      {placeholder}
       rows="1"
       {disabled}
     ></textarea>
