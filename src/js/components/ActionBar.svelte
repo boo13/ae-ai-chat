@@ -4,6 +4,7 @@
 
   interface Props {
     disabled: boolean;
+    providerName: string;
     supportsImages: boolean;
     hasError: boolean;
     aiActionReady: boolean;
@@ -13,6 +14,7 @@
 
   let {
     disabled,
+    providerName,
     supportsImages,
     hasError,
     aiActionReady,
@@ -20,11 +22,11 @@
     onclick,
   }: Props = $props();
 
-  const visibleActions = $derived.by(() =>
-    quickActions.filter((action) => supportsImages || action.handler !== "takeScreenshot")
-  );
-
   function unavailableReason(action: QuickAction): string {
+    if (action.handler === "takeScreenshot" && !supportsImages) {
+      return providerName + " cannot use screenshots because this provider cannot read images.";
+    }
+
     if (action.handler === "fixLastError" && !hasError) {
       return "No recent error to fix.";
     }
@@ -50,9 +52,9 @@
   }
 </script>
 
-<div class="action-drawer" style={`--drawer-cols: ${visibleActions.length}`}>
+<div class="action-drawer" style={`--drawer-cols: ${quickActions.length}`}>
   <div class="action-drawer__grid">
-    {#each visibleActions as action}
+    {#each quickActions as action}
       {@const reason = unavailableReason(action)}
       {@const tooltip = tooltipFor(action)}
       <div class="action-tooltip" data-tooltip={tooltip}>

@@ -783,6 +783,7 @@
     />
     <ActionBar
       disabled={isLoading}
+      providerName={activeProvider.displayName}
       supportsImages={activeProvider.supportsImages}
       hasError={Boolean(lastError)}
       {aiActionReady}
