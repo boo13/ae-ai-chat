@@ -29,27 +29,38 @@ function formatExample(example: ExampleEntry): string {
   return lines.join("\n");
 }
 
+function matchExamples(userMessage: string): ExampleEntry[] {
+  const matched: ExampleEntry[] = [];
+  const matchedIds = new Set<string>();
+
+  for (const pattern of patterns) {
+    if (matchedIds.has(pattern.example.id)) continue;
+    if (!pattern.regex.test(userMessage)) continue;
+
+    matched.push(pattern.example);
+    matchedIds.add(pattern.example.id);
+
+    if (matched.length === MAX_EXAMPLES) break;
+  }
+
+  return matched;
+}
+
 export const examplesKnowledge: KnowledgeSource = {
   id: "examples",
   getStaticContext() {
     return "";
   },
   getMessageContext(userMessage: string) {
-    const matched: ExampleEntry[] = [];
-    const matchedIds = new Set<string>();
-
-    for (const pattern of patterns) {
-      if (matchedIds.has(pattern.example.id)) continue;
-      if (!pattern.regex.test(userMessage)) continue;
-
-      matched.push(pattern.example);
-      matchedIds.add(pattern.example.id);
-
-      if (matched.length === MAX_EXAMPLES) break;
-    }
+    const matched = matchExamples(userMessage);
 
     if (matched.length === 0) return "";
 
     return ["## Verified Working Examples", ...matched.map(formatExample)].join("\n\n");
+  },
+  getMessageContextDiagnostics(userMessage: string) {
+    return {
+      ids: matchExamples(userMessage).map((example) => example.id),
+    };
   },
 };

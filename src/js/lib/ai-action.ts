@@ -1,4 +1,4 @@
-import { fs, path } from "./cep/node";
+import { fs, path, os, child_process } from "./cep/node";
 import type { ScriptValidationResult } from "./knowledge/validator";
 import { validateScript } from "./knowledge/validator";
 import { csi, evalTS } from "./utils/bolt";
@@ -500,4 +500,31 @@ export async function runAiAction(projectRoot?: string) {
   }
 
   return await evalTS("runScriptFile", paths.scriptPath);
+}
+
+export function getAiActionScriptPath(projectRoot?: string): string | null {
+  if (!fs) return null;
+  const paths = resolveAiActionPaths(projectRoot);
+  if (!paths) return null;
+  return fs.existsSync(paths.scriptPath) ? paths.scriptPath : null;
+}
+
+export function revealAiActionInFinder(
+  projectRoot?: string
+): { ok: boolean; error?: string } {
+  const scriptPath = getAiActionScriptPath(projectRoot);
+  if (!scriptPath) {
+    return { ok: false, error: "No AI Action script found." };
+  }
+  if (!os || os.platform() !== "darwin") {
+    return { ok: false, error: "Reveal in Finder is only available on macOS." };
+  }
+  try {
+    child_process
+      .spawn("open", ["-R", scriptPath], { detached: true, stdio: "ignore" })
+      .unref();
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }

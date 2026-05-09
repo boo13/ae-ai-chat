@@ -8,10 +8,13 @@
     clearAiAction,
     parseAiActionResponse,
     readAiActionScript,
+    revealAiActionInFinder,
     runAiAction,
     saveAiAction,
   } from "../lib/ai-action";
+  import ScriptViewer from "../components/ScriptViewer.svelte";
   import { buildContext } from "../lib/context";
+  import { logFailure } from "../lib/error-log";
   import { getErrorHint } from "../lib/error-patterns";
   import ChatMessageComponent from "../components/ChatMessage.svelte";
   import ChatInput from "../components/ChatInput.svelte";
@@ -24,6 +27,7 @@
   import { buildAutoFixPrompt } from "../lib/auto-fix";
   import { getRuntimeEnvironment } from "../lib/runtime-environment";
   import type { ExpressionError } from "../lib/auto-fix";
+  import type { ErrorKind, TriggerPath } from "../lib/error-log";
   import type {
     ChatMessage,
     ProviderDefinition,
@@ -54,6 +58,11 @@
   let aiActionReady: boolean = $state(false);
   let aiActionWarnings: ScriptValidationWarning[] = $state([]);
   let aiActionErrors: ScriptValidationError[] = $state([]);
+  let aiActionInjectedExampleIds: string[] = $state([]);
+  let aiActionOriginalUserMessage: string = $state("");
+  let scriptViewerOpen: boolean = $state(false);
+  let scriptViewerContent: string = $state("");
+  let scriptViewerSummary: string = $state("");
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
   let pendingContexts: ContextChip[] = $state([]);
@@ -152,6 +161,42 @@
     lastErrorLine = errorLine;
   }
 
+  function latestUserMessage(): string {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === "user") return messages[i].content;
+    }
+    return "";
+  }
+
+  function logAiActionFailure(input: {
+    errorKind: ErrorKind;
+    errorString: string;
+    script: string | null;
+    expressionErrors?: ExpressionError[];
+    validationErrors?: ScriptValidationError[];
+    validationWarnings?: ScriptValidationWarning[];
+    injectedExampleIds: string[];
+    triggerPath: TriggerPath;
+    originalUserMessage?: string;
+  }) {
+    if (!input.script) return;
+
+    logFailure({
+      originalUserMessage:
+        input.originalUserMessage || autoFixOriginalPrompt || latestUserMessage(),
+      provider: activeProvider?.id || "unknown",
+      model,
+      errorKind: input.errorKind,
+      errorString: input.errorString,
+      validationErrors: input.validationErrors,
+      validationWarnings: input.validationWarnings,
+      expressionErrors: input.expressionErrors,
+      script: input.script,
+      injectedExampleIds: input.injectedExampleIds,
+      triggerPath: input.triggerPath,
+    });
+  }
+
   function handleCancel() {
     autoFixAborted = true;
     setStatus({
@@ -168,12 +213,14 @@
     script: string | null,
     expressionErrors: ExpressionError[],
     validationErrors: ScriptValidationError[],
-    validationWarnings: ScriptValidationWarning[] = []
+    validationWarnings: ScriptValidationWarning[],
+    logOptions: { errorKind: ErrorKind; injectedExampleIds: string[] }
   ) {
     if (autoFixAborted) {
       addMessage("system", "Auto-fix cancelled.");
       return;
     }
+
     if (autoFixAttempt >= AUTO_FIX_MAX) {
       addMessage(
         "system",
@@ -181,6 +228,18 @@
       );
       return;
     }
+
+    logAiActionFailure({
+      errorKind: logOptions.errorKind,
+      errorString,
+      script,
+      expressionErrors,
+      validationErrors,
+      validationWarnings,
+      injectedExampleIds: logOptions.injectedExampleIds,
+      triggerPath: "auto-run",
+    });
+
     autoFixAttempt += 1;
     addMessage(
       "system",
@@ -209,6 +268,8 @@
     rememberError("");
     pendingScreenshot = null;
     aiActionReady = false;
+    aiActionInjectedExampleIds = [];
+    aiActionOriginalUserMessage = "";
     setAiActionWarnings([]);
     setStatus(null);
     autoFixAttempt = 0;
@@ -378,6 +439,8 @@
             text: "Saving AI Action...",
           });
           const saved = saveAiAction(context.projectRoot, parsed.scriptContent, displayText);
+          aiActionInjectedExampleIds = context.diagnostics.exampleIds.slice();
+          aiActionOriginalUserMessage = autoFixOriginalPrompt || text;
           addMessage("system", "AI Action ready: " + saved.summary);
 
           if (validationErrors.length > 0) {
@@ -399,7 +462,12 @@
               null,
               parsed.scriptContent,
               [],
-              validationErrors
+              validationErrors,
+              [],
+              {
+                errorKind: "validation",
+                injectedExampleIds: context.diagnostics.exampleIds,
+              }
             );
           } else {
             aiActionReady = true;
@@ -428,7 +496,11 @@
                   parsed.scriptContent,
                   [],
                   [],
-                  warnings
+                  warnings,
+                  {
+                    errorKind: "warning",
+                    injectedExampleIds: context.diagnostics.exampleIds,
+                  }
                 );
               } else {
                 setStatus({
@@ -456,7 +528,12 @@
                     errorLine,
                     parsed.scriptContent,
                     exprErrors,
-                    []
+                    [],
+                    [],
+                    {
+                      errorKind: "runtime",
+                      injectedExampleIds: context.diagnostics.exampleIds,
+                    }
                   );
                 } else if (exprErrors.length > 0) {
                   const exprSummary = exprErrors
@@ -482,7 +559,12 @@
                     null,
                     parsed.scriptContent,
                     exprErrors,
-                    []
+                    [],
+                    [],
+                    {
+                      errorKind: "expression",
+                      injectedExampleIds: context.diagnostics.exampleIds,
+                    }
                   );
                 } else {
                   setStatus({
@@ -555,11 +637,10 @@
     }
   }
 
-  async function handleAction(action: {
-    label: string;
-    prompt?: string;
-    handler?: string;
-  }) {
+  async function handleAction(
+    action: { label: string; prompt?: string; handler?: string },
+    event?: MouseEvent
+  ) {
     if (action.handler === "takeScreenshot") {
       await handleScreenshot();
       return;
@@ -612,6 +693,26 @@
     }
 
     if (action.handler === "runAiAction") {
+      if (event?.shiftKey) {
+        const result = revealAiActionInFinder(sessionProjectRoot);
+        if (!result.ok) addMessage("system", "Couldn't reveal AI Action: " + result.error);
+        return;
+      }
+
+      if (event?.altKey) {
+        const script = readAiActionScript(sessionProjectRoot);
+        if (!script) {
+          addMessage("system", "No AI Action script saved yet.");
+        } else {
+          scriptViewerContent = script;
+          const firstLine = script.split("\n").find((l) => l.startsWith("// Summary:"));
+          scriptViewerSummary = firstLine ? firstLine.replace("// Summary:", "").trim() : "";
+          scriptViewerOpen = true;
+        }
+        return;
+      }
+
+      let manualScript: string | null = null;
       try {
         if (!sessionProjectRoot) {
           const context = await buildContext();
@@ -630,13 +731,46 @@
           addMessage("system", "Running AI Action despite validation warnings.");
         }
 
+        manualScript = readAiActionScript(sessionProjectRoot);
         const runResult = await runAiAction(sessionProjectRoot);
+        const exprErrors: ExpressionError[] = (runResult as any)?.expressionErrors || [];
+
         if (runResult && "error" in runResult && runResult.error) {
-          addMessage("system", "AI Action failed: " + runResult.error);
+          const errorStr = String(runResult.error);
+          addMessage("system", "AI Action failed: " + errorStr);
           rememberError(
-            String(runResult.error),
+            errorStr,
             typeof runResult.errorLine === "number" ? runResult.errorLine : null
           );
+          logAiActionFailure({
+            errorKind: "runtime",
+            errorString: errorStr,
+            script: manualScript,
+            expressionErrors: exprErrors,
+            injectedExampleIds: aiActionInjectedExampleIds,
+            triggerPath: "manual-run",
+            originalUserMessage: aiActionOriginalUserMessage,
+          });
+        } else if (exprErrors.length > 0) {
+          const exprSummary = exprErrors
+            .map((e) => `prop "${e.name || "?"}" line ${e.line}: ${e.error}`)
+            .join("; ");
+          addMessage("system", "AI Action ran but expression errors occurred:\n" +
+            exprErrors.map((e) =>
+              `  prop "${e.name || "?"}" line ${e.line}: ${e.error}` +
+              (e.expr ? `\n    expr: "${e.expr}"` : "")
+            ).join("\n")
+          );
+          rememberError(exprSummary, null);
+          logAiActionFailure({
+            errorKind: "expression",
+            errorString: exprSummary,
+            script: manualScript,
+            expressionErrors: exprErrors,
+            injectedExampleIds: aiActionInjectedExampleIds,
+            triggerPath: "manual-run",
+            originalUserMessage: aiActionOriginalUserMessage,
+          });
         } else {
           setAiActionWarnings([]);
           aiActionErrors = [];
@@ -646,6 +780,14 @@
         const errMsg = err?.message || String(err);
         addMessage("system", "AI Action unavailable: " + errMsg);
         rememberError(errMsg);
+        logAiActionFailure({
+          errorKind: "runtime",
+          errorString: errMsg,
+          script: manualScript,
+          injectedExampleIds: aiActionInjectedExampleIds,
+          triggerPath: "manual-run",
+          originalUserMessage: aiActionOriginalUserMessage,
+        });
       }
       return;
     }
@@ -746,6 +888,18 @@
           Clear
         </button>
       </div>
+    {/if}
+
+    {#if scriptViewerOpen}
+      <ScriptViewer
+        content={scriptViewerContent}
+        summary={scriptViewerSummary}
+        onreveal={() => {
+          const result = revealAiActionInFinder(sessionProjectRoot);
+          if (!result.ok) addMessage("system", "Couldn't reveal AI Action: " + result.error);
+        }}
+        onclose={() => (scriptViewerOpen = false)}
+      />
     {/if}
 
     {#if aiActionWarnings.length > 0}

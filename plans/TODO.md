@@ -1,21 +1,31 @@
 # TODO
 
-## Implement Redesign
+## Few-Shot Examples
 
-Design source: `plans/ae-ai-chat-design/` (handoff from Claude Design).
+Plan source: `plans/few-shot-examples.md`.
 
-### Phase 1 — Visual Reskin
-- [x] See `plans/redesign-phase-1-visual-reskin.md`
+### Phase 1 — Infrastructure + First 3-5 Examples
+- [x] Add examples generation to `scripts/generate-knowledge.mjs`
+- [x] Generate `src/js/lib/knowledge/data/examples.ts`
+- [x] Add `src/js/lib/knowledge/examples.ts`
+- [x] Register `examplesKnowledge` last in `src/js/lib/knowledge/index.ts`
+- [x] Add and AE-verify the initial 5 examples
+- [x] Verify injection behavior with `pnpm few-shot:check`
 
-### Phase 2 — Add Context Chips
-- [x] See `plans/redesign-phase-2-context-chips.md`
+### Error Capture — Phase 2 Prerequisite
+- [x] Add a dev-only append-only failure log at `.session/error-log.jsonl`
+- [x] Capture injected example IDs without changing knowledge source string return values
+- [x] Log validation, warning-blocked auto-run, runtime, and expression failures from auto-run paths
+- [x] Log runtime and expression failures from manual AI Action runs
+- [x] Add `pnpm errors:summarize` to group observed failures for example selection
+- [ ] Collect enough dev failures to identify repeat patterns before adding examples
 
-## Implement Fourth Plan
-- [x] Implement `plans/few-shot-examples.md`
+### Phase 2 — Expanded Example Set (Blocked)
+Blocked until Error Capture has observed failures. Do not add examples based on intuition alone.
 
-## Provider Selection UX
-- [x] Add an in-panel way to switch providers after initial selection.
-  - Current behavior: choosing Claude/Codex stores `selectedProviderId` in CEP `localStorage`, and future launches auto-select that provider without showing the provider picker.
-  - Problem: users can get stuck on Claude or Codex with no visible way back to the opening provider choice screen.
-  - Likely fix: add a compact provider switch control in the header, or make the provider title open the existing `ProviderPicker`.
-  - Acceptance: user can switch between available providers without clearing `localStorage` or reinstalling the extension.
+- [ ] Review `pnpm errors:summarize` output and choose repeat failure categories
+- [ ] Add 10-15 more examples in `../ae-ai-starter/Scripts/verified/examples/` based on observed failure patterns
+- [ ] AE-verify each new example script
+- [ ] Regenerate knowledge with `node scripts/generate-knowledge.mjs`
+- [ ] Confirm all new examples appear in `src/js/lib/knowledge/data/examples.ts`
+- [ ] For each new example category, send a representative chat prompt and verify the expected example is injected

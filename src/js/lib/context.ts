@@ -76,6 +76,9 @@ interface SelectedPropertyDetails {
 export interface ChatContext {
   systemContext: string;
   projectRoot?: string;
+  diagnostics: {
+    exampleIds: string[];
+  };
 }
 
 type CompChip = Extract<ContextChip, { type: "comp" }>;
@@ -431,7 +434,8 @@ export async function buildContext(
   );
 
   lines.push("");
-  lines.push(getKnowledgeContext(userMessage));
+  const knowledgeContext = getKnowledgeContext(userMessage, { diagnostics: true });
+  lines.push(knowledgeContext.text);
 
   lines.push("");
   lines.push("## AI Action Protocol");
@@ -443,5 +447,6 @@ export async function buildContext(
   return {
     systemContext: lines.join("\n"),
     projectRoot: projectRoot || undefined,
+    diagnostics: knowledgeContext.diagnostics,
   };
 }

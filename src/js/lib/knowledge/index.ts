@@ -40,8 +40,26 @@ const RULES = `## Rules for Script Generation
 The panel static-checks generated scripts before running. The following patterns are errors that block execution:
 ${REJECTION_LIST}`;
 
-export function getKnowledgeContext(userMessage?: string): string {
+export interface KnowledgeContextDiagnostics {
+  exampleIds: string[];
+}
+
+export interface KnowledgeContextResult {
+  text: string;
+  diagnostics: KnowledgeContextDiagnostics;
+}
+
+export function getKnowledgeContext(userMessage?: string): string;
+export function getKnowledgeContext(
+  userMessage: string | undefined,
+  options: { diagnostics: true }
+): KnowledgeContextResult;
+export function getKnowledgeContext(
+  userMessage?: string,
+  options?: { diagnostics?: boolean }
+): string | KnowledgeContextResult {
   const sections: string[] = [];
+  const exampleIds = new Set<string>();
 
   for (const source of sources) {
     const staticCtx = source.getStaticContext();
@@ -49,11 +67,30 @@ export function getKnowledgeContext(userMessage?: string): string {
 
     if (userMessage && source.getMessageContext) {
       const msgCtx = source.getMessageContext(userMessage);
-      if (msgCtx) sections.push(msgCtx);
+      if (msgCtx) {
+        sections.push(msgCtx);
+
+        const diagnostics = source.getMessageContextDiagnostics?.(userMessage);
+        if (diagnostics) {
+          for (const id of diagnostics.ids) {
+            exampleIds.add(id);
+          }
+        }
+      }
     }
   }
 
   sections.push(RULES);
 
-  return sections.join("\n\n");
+  const text = sections.join("\n\n");
+  if (options?.diagnostics) {
+    return {
+      text,
+      diagnostics: {
+        exampleIds: Array.from(exampleIds),
+      },
+    };
+  }
+
+  return text;
 }

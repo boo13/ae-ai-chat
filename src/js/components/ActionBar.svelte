@@ -9,7 +9,7 @@
     hasError: boolean;
     aiActionReady: boolean;
     aiActionBlocked: boolean;
-    onclick: (action: QuickAction) => void;
+    onclick: (action: QuickAction, event: MouseEvent) => void;
   }
 
   let {
@@ -41,14 +41,15 @@
 
   function tooltipFor(action: QuickAction): string {
     const unavailable = unavailableReason(action);
-    if (unavailable) return unavailable;
-
-    return action.description;
+    const base = unavailable || action.description;
+    if (action.handler === "runAiAction") return base + "\n⇧-click: reveal · ⌥-click: view";
+    return base;
   }
 
-  function handleClick(action: QuickAction) {
-    if (disabled || unavailableReason(action)) return;
-    onclick(action);
+  function handleClick(action: QuickAction, event: MouseEvent) {
+    const isModified = action.handler === "runAiAction" && (event.shiftKey || event.altKey);
+    if (!isModified && (disabled || unavailableReason(action))) return;
+    onclick(action, event);
   }
 </script>
 
@@ -64,7 +65,7 @@
           disabled={disabled}
           aria-disabled={reason ? "true" : undefined}
           aria-label={`${action.label}: ${tooltip}`}
-          onclick={() => handleClick(action)}
+          onclick={(event) => handleClick(action, event)}
           title={tooltip}
           type="button"
         >
@@ -125,7 +126,7 @@
     transition:
       opacity 100ms ease,
       transform 100ms ease;
-    white-space: normal;
+    white-space: pre-line;
   }
 
   .action-tooltip:first-child::after {
