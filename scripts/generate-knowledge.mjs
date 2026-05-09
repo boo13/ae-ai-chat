@@ -162,6 +162,25 @@ function failInvalidRecipe(file, message) {
   process.exit(1);
 }
 
+const TERM_STOP_WORDS = new Set([
+  "a", "an", "the", "to", "for", "with", "on", "in", "of", "it", "is",
+  "by", "from", "and", "or", "at", "as", "so", "up", "all", "into", "its",
+  "any", "be", "are", "how", "can", "this", "that", "each", "which",
+  "between", "per", "via", "new", "one", "two", "add", "set", "get", "use",
+  "do", "make",
+  // AE-generic terms that appear in almost every recipe and don't discriminate
+  "layer", "layers",
+]);
+
+function termTokenize(text) {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !TERM_STOP_WORDS.has(t));
+  return [...new Set(tokens)];
+}
+
 function scriptCodeOnlyView(content) {
   let result = "";
   let i = 0;
@@ -294,11 +313,14 @@ function validateRecipe(file, example) {
     failInvalidRecipe(file, "notes must be a string when present");
   }
 
+  const normalizedScript = normalizeUndoGroup(example.script);
+
   const validated = {
     id: example.id,
     description: example.description,
     keywords: example.keywords,
-    script: normalizeUndoGroup(example.script),
+    script: normalizedScript,
+    terms: termTokenize([example.description, ...example.keywords].join(" ")),
   };
 
   if (example.notes) {
@@ -562,6 +584,7 @@ writeObjectModule(
   description: string;
   keywords: string[];
   script: string;
+  terms: string[];
   notes?: string;
 }
 

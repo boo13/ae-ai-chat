@@ -6,6 +6,7 @@ export interface RecipeEntry {
   description: string;
   keywords: string[];
   script: string;
+  terms: string[];
   notes?: string;
 }
 
@@ -22,6 +23,18 @@ export const RECIPES: RecipeEntry[] = [
       "wiggle"
     ],
     "script": "app.beginUndoGroup(\"Assign Expression\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addSolid([0.15, 0.18, 0.24], \"Expression Opacity\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n  var opacity = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n  opacity.setValue(80);\n  opacity.expression = \"var base = 80;\\nvar amount = 20;\\nbase + Math.sin(time * 6) * amount;\";\n  if (opacity.expressionError !== \"\") {\n    throw new Error(opacity.expressionError);\n  }\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "initial",
+      "property",
+      "value",
+      "then",
+      "assign",
+      "expression",
+      "string",
+      "expressions",
+      "engine",
+      "wiggle"
+    ],
     "notes": "Use setValue or setValueAtTime for script-side values. Assign expressions as strings to .expression, then check expressionError."
   },
   {
@@ -37,6 +50,19 @@ export const RECIPES: RecipeEntry[] = [
       "source time"
     ],
     "script": "app.beginUndoGroup(\"Enable Time Remap\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  layer.timeRemapEnabled = true;\n  var timeRemap = layer.property(\"ADBE Time Remapping\");\n  // AE auto-creates 2 keyframes when enabling: at layer.inPoint and layer.outPoint.\n  // keyValue is source-time in seconds (where in the source to sample),\n  // NOT comp-time.\n  // Read auto-created keyframes before adding new ones:\n  var autoKeyCount = timeRemap.numKeys;\n  // Example: hold on frame 0 until 1s, then play from frame 0 again at 2s\n  // timeRemap.setValueAtTime(0, 0);      // comp 0s -> source 0s\n  // timeRemap.setValueAtTime(1.0, 0);    // comp 1s -> still source 0s (hold)\n  // timeRemap.setValueAtTime(2.0, 1.0);  // comp 2s -> source 1s\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "enable",
+      "time",
+      "remapping",
+      "keyframes",
+      "remap",
+      "source",
+      "timeremapenabled",
+      "retime",
+      "speed",
+      "ramp",
+      "adbe"
+    ],
     "notes": "When timeRemapEnabled is first set to true, AE automatically creates two keyframes: one at layer.inPoint (value=0) and one at layer.outPoint (value=source duration). Time Remap values are source-time seconds — where in the source footage to sample — not comp-time positions. Always read the auto-created keyframes before adding more to avoid conflicts."
   },
   {
@@ -52,6 +78,19 @@ export const RECIPES: RecipeEntry[] = [
       "clone composition"
     ],
     "script": "app.beginUndoGroup(\"Duplicate Composition\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // Shallow duplicate: nested comps remain shared references.\n  // Use deepDuplicateComp for a fully decoupled copy.\n  var compMap = {};\n  var result = deepDuplicateComp(comp, compMap);\n  result.name = comp.name + \" copy\";\n  alert(\"Created: \" + result.name);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\nfunction deepDuplicateComp(comp, compMap) {\n  if (compMap[comp.id]) return compMap[comp.id];\n  var dup = comp.duplicate();\n  compMap[comp.id] = dup;\n  var i;\n  for (i = 1; i <= dup.numLayers; i++) {\n    var layer = dup.layer(i);\n    if (layer.source && layer.source instanceof CompItem) {\n      layer.replaceSource(deepDuplicateComp(layer.source, compMap), false);\n    }\n  }\n  return dup;\n}",
+    "terms": [
+      "duplicate",
+      "composition",
+      "deep",
+      "copy",
+      "fully",
+      "decouple",
+      "nested",
+      "comps",
+      "comp",
+      "replacesource",
+      "clone"
+    ],
     "notes": "comp.duplicate() is a shallow copy — nested comps inside remain shared references. Editing a nested comp affects both the original and the duplicate. deepDuplicateComp recursively duplicates each nested CompItem and uses replaceSource(newComp, false) to redirect layers. compMap keyed by comp.id prevents infinite recursion on shared nested comps."
   },
   {
@@ -67,6 +106,17 @@ export const RECIPES: RecipeEntry[] = [
       "precomp"
     ],
     "script": "app.beginUndoGroup(\"Pre-compose Selected Layers\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select at least one layer to pre-compose.\");\n  }\n  // Collect 1-based integer indices -- precompose() does NOT accept Layer objects.\n  var indices = [];\n  var i;\n  for (i = 0; i < comp.selectedLayers.length; i++) {\n    indices.push(comp.selectedLayers[i].index);\n  }\n  // Sort ascending -- precompose expects a sorted index array.\n  indices.sort(function(a, b) { return a - b; });\n  var newCompName = \"Precomp\";\n  // moveAllAttributes=true (the default) moves all layer attributes into the new comp.\n  // Set to false only when pre-composing a single layer and you want to keep attributes.\n  var newComp = comp.layers.precompose(indices, newCompName, true);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "pre",
+      "compose",
+      "currently",
+      "selected",
+      "comp",
+      "precompose",
+      "nest",
+      "group",
+      "precomp"
+    ],
     "notes": "precompose() takes an array of 1-based integer indices, NOT Layer objects. moveAllAttributes defaults to true; setting it to false is only valid when the array has exactly one index. Returns the new CompItem."
   },
   {
@@ -81,6 +131,16 @@ export const RECIPES: RecipeEntry[] = [
       "multiple properties"
     ],
     "script": "app.beginUndoGroup(\"Animate Effect Properties\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer;\n  if (comp.selectedLayers.length > 0) {\n    layer = comp.selectedLayers[0];\n  } else {\n    layer = comp.layers.addSolid([0.2, 0.2, 0.2], \"Effect Target\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n  }\n  var effects = layer.property(\"ADBE Effect Parade\");\n  var blur = effects.addProperty(\"ADBE Gaussian Blur 2\");\n  var blurriness = blur.property(\"ADBE Gaussian Blur 2-0001\");\n  blurriness.setValueAtTime(0, 0);\n  blurriness.setValueAtTime(1, 40);\n  blur.property(\"ADBE Gaussian Blur 2-0002\").setValue(1);\n  blur.property(\"ADBE Gaussian Blur 2-0003\").setValue(1);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "effect",
+      "multiple",
+      "properties",
+      "animate",
+      "property",
+      "manipulation",
+      "setvalueattime",
+      "addproperty"
+    ],
     "notes": "Use addProperty with the verified effect matchName, then access individual effect properties by verified property matchName."
   },
   {
@@ -95,6 +155,17 @@ export const RECIPES: RecipeEntry[] = [
       "duplicate keyframes"
     ],
     "script": "app.beginUndoGroup(\"Copy Keyframes\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  if (comp.selectedLayers.length < 1) {\n    throw new Error(\"Select at least one layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  var srcProp = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n  var dstProp = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n  // Replace srcProp and dstProp with the actual source and destination properties.\n  // Both properties must exist on accessible layers in the composition.\n  var keyCount = srcProp.numKeys;\n  if (keyCount === 0) {\n    throw new Error(\"Source property has no keyframes.\");\n  }\n  // Snapshot all keyframe data before modifying anything.\n  var snapTimes = [];\n  var snapValues = [];\n  var snapInEase = [];\n  var snapOutEase = [];\n  var i;\n  for (i = 1; i <= keyCount; i++) {\n    snapTimes.push(srcProp.keyTime(i));\n    snapValues.push(srcProp.keyValue(i));\n    snapInEase.push(srcProp.keyInTemporalEase(i));\n    snapOutEase.push(srcProp.keyOutTemporalEase(i));\n  }\n  // Write keyframes to destination, then apply ease.\n  for (i = 0; i < keyCount; i++) {\n    dstProp.setValueAtTime(snapTimes[i], snapValues[i]);\n  }\n  for (i = 0; i < keyCount; i++) {\n    dstProp.setTemporalEaseAtKey(i + 1, snapInEase[i], snapOutEase[i]);\n  }\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "copy",
+      "keyframes",
+      "property",
+      "another",
+      "keys",
+      "keyframe",
+      "transfer",
+      "paste",
+      "duplicate"
+    ],
     "notes": "There is no native copyKeyframes() API. Always snapshot all keyframe data into arrays first, then write setValueAtTime, then re-apply ease — setting ease changes key indices, so re-apply in a second pass. Spatial properties also need setSpatialTangentsAtKey after the ease pass."
   },
   {
@@ -110,6 +181,18 @@ export const RECIPES: RecipeEntry[] = [
       "eased keyframes"
     ],
     "script": "app.beginUndoGroup(\"Ease Opacity Keyframes\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addSolid([1, 0.45, 0.1], \"Eased Opacity\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n  var opacity = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n  opacity.setValueAtTime(0, 0);\n  opacity.setValueAtTime(1, 100);\n  var easeIn = new KeyframeEase(0, 80);\n  var easeOut = new KeyframeEase(0, 80);\n  opacity.setTemporalEaseAtKey(1, [easeIn], [easeOut]);\n  opacity.setTemporalEaseAtKey(2, [easeIn], [easeOut]);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "create",
+      "keyframes",
+      "apply",
+      "keyframeease",
+      "settemporaleaseatkey",
+      "keyframe",
+      "ease",
+      "temporal",
+      "easing",
+      "eased"
+    ],
     "notes": "setTemporalEaseAtKey takes arrays of KeyframeEase objects. One-dimensional properties use one ease object per side."
   },
   {
@@ -124,6 +207,20 @@ export const RECIPES: RecipeEntry[] = [
       "backward animation"
     ],
     "script": "app.beginUndoGroup(\"Reverse Keyframes\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  // Replace with the actual property path to reverse.\n  var prop = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\n  var keyCount = prop.numKeys;\n  if (keyCount < 2) {\n    throw new Error(\"Property needs at least 2 keyframes to reverse.\");\n  }\n  // Snapshot everything before touching keyframes.\n  var i;\n  var snapTimes = [];\n  var snapValues = [];\n  var snapInEase = [];\n  var snapOutEase = [];\n  var snapInInterp = [];\n  var snapOutInterp = [];\n  for (i = 1; i <= keyCount; i++) {\n    snapTimes.push(prop.keyTime(i));\n    snapValues.push(prop.keyValue(i));\n    snapInEase.push(prop.keyInTemporalEase(i));\n    snapOutEase.push(prop.keyOutTemporalEase(i));\n    snapInInterp.push(prop.keyInInterpolationType(i));\n    snapOutInterp.push(prop.keyOutInterpolationType(i));\n  }\n  // Delete all keys from highest index down (renumbering safe).\n  for (i = keyCount; i >= 1; i--) {\n    prop.removeKey(i);\n  }\n  // Rewrite in reverse: original last key maps to original first time.\n  for (i = 0; i < keyCount; i++) {\n    var srcIdx = keyCount - 1 - i; // reversed source index\n    prop.setValueAtTime(snapTimes[i], snapValues[srcIdx]);\n  }\n  // Reapply eases with in/out swapped.\n  for (i = 1; i <= keyCount; i++) {\n    var srcIdx2 = keyCount - i; // reversed source index (0-based)\n    prop.setTemporalEaseAtKey(\n      i,\n      snapOutEase[srcIdx2], // original outEase becomes inEase\n      snapInEase[srcIdx2]   // original inEase becomes outEase\n    );\n  }\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "reverse",
+      "keyframes",
+      "property",
+      "snapshotting",
+      "then",
+      "rewriting",
+      "order",
+      "flip",
+      "animation",
+      "invert",
+      "time",
+      "backward"
+    ],
     "notes": "There is no native reverseKeyframes() API. Always delete keys from highest index downward — removeKey() renumbers all higher indices immediately. When rebuilding reversed keyframes, easeIn and easeOut swap roles: the original keyOutTemporalEase becomes the new keyInTemporalEase at the reversed position. Spatial properties also need setSpatialTangentsAtKey with tangents reversed."
   },
   {
@@ -140,6 +237,19 @@ export const RECIPES: RecipeEntry[] = [
       "setspatial"
     ],
     "script": "app.beginUndoGroup(\"Set Spatial Ease on Position\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  if (comp.selectedLayers.length < 1) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  var position = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\n  // Create at least two position keyframes first.\n  var cx = comp.width / 2;\n  var cy = comp.height / 2;\n  position.setValueAtTime(0, [cx - 300, cy]);\n  position.setValueAtTime(1, [cx, cy - 200]);\n  position.setValueAtTime(2, [cx + 300, cy]);\n  // setSpatialTangentsAtKey only works on spatial (TwoD_SPATIAL / ThreeD_SPATIAL) properties.\n  // It does NOT work on Scale, Opacity, or other non-spatial properties.\n  // Disable auto-bezier and continuous bezier so AE does not override the tangents.\n  var keyIndex;\n  for (keyIndex = 1; keyIndex <= position.numKeys; keyIndex++) {\n    position.setSpatialAutoBezierAtKey(keyIndex, false);\n    position.setSpatialContinuousAtKey(keyIndex, false);\n    // inTangent and outTangent are [x, y] pixel offsets from the keyframe anchor.\n    position.setSpatialTangentsAtKey(keyIndex, [-100, 0], [100, 0]);\n  }\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "spatial",
+      "ease",
+      "position",
+      "keyframes",
+      "curved",
+      "motion",
+      "path",
+      "tangent",
+      "bezier",
+      "setspatialatkey",
+      "setspatial"
+    ],
     "notes": "setSpatialTangentsAtKey only works on TwoD_SPATIAL or ThreeD_SPATIAL properties (e.g. Position) — calling it on Scale or Opacity throws. Always call setSpatialAutoBezierAtKey(keyIndex, false) and setSpatialContinuousAtKey(keyIndex, false) first, otherwise AE overrides your tangents on the next frame render."
   },
   {
@@ -153,6 +263,19 @@ export const RECIPES: RecipeEntry[] = [
       "copy layer another comp"
     ],
     "script": "app.beginUndoGroup(\"Copy Layer to Comp\");\ntry {\n  var srcComp = app.project.activeItem;\n  if (!srcComp || !(srcComp instanceof CompItem)) {\n    throw new Error(\"Please select the source composition.\");\n  }\n  if (srcComp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer to copy.\");\n  }\n  var layer = srcComp.selectedLayers[0];\n  // Find target comp by name.\n  var targetComp = null;\n  var i;\n  for (i = 1; i <= app.project.numItems; i++) {\n    var item = app.project.item(i);\n    if (item instanceof CompItem && item.name === \"Target Comp Name\") {\n      targetComp = item;\n      break;\n    }\n  }\n  if (!targetComp) {\n    throw new Error(\"Target composition not found.\");\n  }\n  // copyToComp returns undefined, not the new layer.\n  // The copy becomes targetComp.layer(1) immediately after the call.\n  layer.copyToComp(targetComp);\n  var newLayer = targetComp.layer(1);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "copy",
+      "comp",
+      "preserving",
+      "properties",
+      "keyframes",
+      "copytocomp",
+      "move",
+      "comps",
+      "duplicate",
+      "composition",
+      "another"
+    ],
     "notes": "copyToComp(targetComp) copies a layer with all properties, keyframes, and effects. It returns undefined — not the new layer. The copy is always inserted at index 1 (top of the stack) in the target comp. To reference the new layer immediately, use targetComp.layer(1) right after the call. The original layer is unchanged."
   },
   {
@@ -168,6 +291,15 @@ export const RECIPES: RecipeEntry[] = [
       "layer copy"
     ],
     "script": "app.beginUndoGroup(\"Duplicate and Offset Layer\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  if (comp.selectedLayers.length < 1) {\n    throw new Error(\"Select a layer to duplicate.\");\n  }\n  var original = comp.selectedLayers[0];\n  // duplicate() inserts the copy at index 1 (top of stack).\n  var copy = original.duplicate();\n  copy.name = original.name + \" copy\";\n  // startTime slides the whole layer bar in comp time (not a trim handle).\n  // .inPoint and .outPoint are trim positions -- distinct from startTime.\n  var offsetSeconds = 0.5;\n  copy.startTime = original.startTime + offsetSeconds;\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "duplicate",
+      "offset",
+      "copy",
+      "comp",
+      "time",
+      "stagger",
+      "starttime"
+    ],
     "notes": "duplicate() always inserts the new layer at index 1. Use .startTime to slide the layer bar in comp time; do NOT confuse with .inPoint/.outPoint which are trim handles on the source."
   },
   {
@@ -183,6 +315,17 @@ export const RECIPES: RecipeEntry[] = [
       "null parent"
     ],
     "script": "app.beginUndoGroup(\"Parent Layer by Name\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var childName = \"Title\";\n  var parentName = \"Background Box\";\n  var child = comp.layer(childName);\n  if (!child) {\n    throw new Error(\"Layer not found: \" + childName);\n  }\n  var parent = comp.layer(parentName);\n  if (!parent) {\n    throw new Error(\"Layer not found: \" + parentName);\n  }\n  // Assigning .parent compensates transforms so the layer does not jump visually.\n  // Use setParentWithJump(parent) if you want to preserve the raw transform values\n  // and intentionally accept the visual snap (e.g. locking values before rigging).\n  child.parent = parent;\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "parent",
+      "another",
+      "name",
+      "without",
+      "transform",
+      "jump",
+      "parenting",
+      "setparentwithjump",
+      "null"
+    ],
     "notes": "layer.parent = target auto-calculates a transform offset to prevent a visual jump. setParentWithJump(target) preserves the raw values and snaps visually — pick deliberately based on whether you want the child to stay in place or keep its current numeric values."
   },
   {
@@ -200,6 +343,18 @@ export const RECIPES: RecipeEntry[] = [
       "import mp4"
     ],
     "script": "app.beginUndoGroup(\"Import File\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  // Replace this path with the actual file path using forward slashes.\n  var filePath = \"/path/to/your/file.mp4\";\n  var file = new File(filePath);\n  if (!file.exists) {\n    throw new Error(\"File not found: \" + filePath);\n  }\n  var importOptions = new ImportOptions(file);\n  // Use ImportAsType.COMP for layered files (PSD, AI) to preserve layers.\n  // Use ImportAsType.FOOTAGE (the default) for video, image, and audio files.\n  importOptions.importAs = ImportAsType.FOOTAGE;\n  var footageItem = app.project.importFile(importOptions);\n  // Optionally add the imported footage to the active comp as a new layer.\n  var newLayer = comp.layers.add(footageItem);\n  newLayer.startTime = 0;\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "import",
+      "file",
+      "project",
+      "footage",
+      "importfile",
+      "options",
+      "importoptions",
+      "png",
+      "video",
+      "mp4"
+    ],
     "notes": "Always use forward slashes in file paths (or a File object, which normalises them). Pick ImportAsType.COMP vs FOOTAGE deliberately for layered files like PSDs — COMP preserves layers, FOOTAGE flattens them."
   },
   {
@@ -215,6 +370,21 @@ export const RECIPES: RecipeEntry[] = [
       "relink footage"
     ],
     "script": "app.beginUndoGroup(\"Replace Footage\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer to replace its source.\");\n  }\n  var layer = comp.selectedLayers[0];\n\n  // Option A: replaceSource -- changes which project item THIS layer references.\n  // Other layers using the original item are unaffected.\n  var newItem = app.project.importFile(\n    new ImportOptions(new File(\"/path/to/new-file.mov\"))\n  );\n  layer.replaceSource(newItem, false); // false = don't shift keyframes\n\n  // Option B: FootageItem.replace() -- changes the source FILE for the project item.\n  // ALL layers referencing that footage item update automatically.\n  // layer.source.replace(new File(\"/path/to/new-file.mov\"));\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "replace",
+      "footage",
+      "source",
+      "specific",
+      "swap",
+      "project",
+      "panel",
+      "item",
+      "file",
+      "replacesource",
+      "change",
+      "update",
+      "relink"
+    ],
     "notes": "Two distinct operations: replaceSource(newProjectItem, fixedToLayerTime) changes which project-panel item a specific layer references — other layers are unaffected. FootageItem.replace(file) changes the source file for the project item itself — all layers using that item update. The fixedToLayerTime boolean in replaceSource controls whether keyframes shift to maintain sync."
   },
   {
@@ -231,6 +401,17 @@ export const RECIPES: RecipeEntry[] = [
       "masking layer"
     ],
     "script": "app.beginUndoGroup(\"Add Mask\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select at least one layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  var newMask = layer.Masks.addProperty(\"Mask\");\n  newMask.maskMode = MaskMode.ADD;\n  newMask.inverted = false;\n  var maskPath = newMask.property(\"maskShape\");\n  var s = maskPath.value;\n  // Vertices are in layer space (centered at anchor point), not comp space.\n  s.vertices = [[0, 0], [200, 0], [200, 200], [0, 200]];\n  s.inTangents = [[0, 0], [0, 0], [0, 0], [0, 0]];\n  s.outTangents = [[0, 0], [0, 0], [0, 0], [0, 0]];\n  s.closed = true;\n  maskPath.setValue(s);\n  // Set feather (in pixels)\n  newMask.property(\"ADBE Mask Feather\").setValue(0);\n  // Optional: set mask opacity and expansion\n  // newMask.property(\"ADBE Mask Opacity\").setValue(100);\n  // newMask.property(\"ADBE Mask Expansion\").setValue(0);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "mask",
+      "shape",
+      "vertices",
+      "mode",
+      "feather",
+      "maskmode",
+      "create",
+      "path",
+      "masking"
+    ],
     "notes": "MaskMode values: NONE, ADD, SUBTRACT, INTERSECT, LIGHTEN, DARKEN, DIFFERENCE. Vertices are in layer space (centered at the layer's anchor point), not comp space — this differs from shape layer vertices. maskPath.value always returns a Shape() object. All three arrays (vertices, inTangents, outTangents) must have the same length for Bezier paths."
   },
   {
@@ -248,6 +429,15 @@ export const RECIPES: RecipeEntry[] = [
       "add shape"
     ],
     "script": "app.beginUndoGroup(\"Add Rectangle with Stroke and Fill\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addShape();\n  layer.name = \"Rectangle\";\n  // All shape content lives under ADBE Root Vectors Group (the layer's Contents).\n  var contents = layer.property(\"ADBE Root Vectors Group\");\n  // Add a Group -- path, stroke, and fill are siblings inside the group's ADBE Vectors Group.\n  var group = contents.addProperty(\"ADBE Vector Group\");\n  group.name = \"Rect Group\";\n  var groupContents = group.property(\"ADBE Vectors Group\");\n  // Add the rect path inside the group.\n  var rect = groupContents.addProperty(\"ADBE Vector Shape - Rect\");\n  rect.property(\"ADBE Vector Rect Size\").setValue([400, 200]);\n  rect.property(\"ADBE Vector Rect Position\").setValue([0, 0]);\n  // Add stroke inside the same group (sibling of rect, not at root Contents level).\n  var stroke = groupContents.addProperty(\"ADBE Vector Graphic - Stroke\");\n  stroke.property(\"ADBE Vector Stroke Color\").setValue([1, 1, 1, 1]);\n  stroke.property(\"ADBE Vector Stroke Width\").setValue(4);\n  // Add fill inside the same group.\n  var fill = groupContents.addProperty(\"ADBE Vector Graphic - Fill\");\n  fill.property(\"ADBE Vector Fill Color\").setValue([0.2, 0.4, 0.8, 1]);\n  // Center the layer.\n  layer.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2]);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "rectangle",
+      "stroke",
+      "fill",
+      "shape",
+      "rect",
+      "vector",
+      "group"
+    ],
     "notes": "Stroke and Fill must be siblings of the path shape inside the group's ADBE Vectors Group — adding them at the root Contents level (outside a group) causes them to appear at the wrong hierarchy level and affects all paths in the layer."
   },
   {
@@ -263,6 +453,17 @@ export const RECIPES: RecipeEntry[] = [
       "start end"
     ],
     "script": "app.beginUndoGroup(\"Animate Trim Paths\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addShape();\n  layer.name = \"Trim Paths Line\";\n  var contents = layer.property(\"ADBE Root Vectors Group\");\n  var group = contents.addProperty(\"ADBE Vector Group\");\n  group.name = \"Animated Line\";\n  var groupContents = group.property(\"ADBE Vectors Group\");\n  var rect = groupContents.addProperty(\"ADBE Vector Shape - Rect\");\n  rect.property(\"ADBE Vector Rect Size\").setValue([600, 180]);\n  rect.property(\"ADBE Vector Rect Position\").setValue([0, 0]);\n  var stroke = groupContents.addProperty(\"ADBE Vector Graphic - Stroke\");\n  stroke.property(\"ADBE Vector Stroke Color\").setValue([0.1, 0.8, 1, 1]);\n  stroke.property(\"ADBE Vector Stroke Width\").setValue(12);\n  var trim = groupContents.addProperty(\"ADBE Vector Filter - Trim\");\n  var startProp = trim.property(\"ADBE Vector Trim Start\");\n  var endProp = trim.property(\"ADBE Vector Trim End\");\n  startProp.setValueAtTime(0, 0);\n  startProp.setValueAtTime(2, 0);\n  endProp.setValueAtTime(0, 0);\n  endProp.setValueAtTime(2, 100);\n  layer.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2]);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "animate",
+      "trim",
+      "paths",
+      "start",
+      "end",
+      "shape",
+      "path",
+      "animation",
+      "vector"
+    ],
     "notes": "Add shape operators to ADBE Vectors Group, then keyframe ADBE Vector Trim Start and ADBE Vector Trim End on the Trim Paths operator."
   },
   {
@@ -279,6 +480,20 @@ export const RECIPES: RecipeEntry[] = [
       "text animation"
     ],
     "script": "app.beginUndoGroup(\"Animate Text Color\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  if (comp.selectedLayers.length < 1) {\n    throw new Error(\"Select a text layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  var textProp = layer.property(\"ADBE Text Properties\").property(\"ADBE Text Document\");\n  // Read the current TextDocument to preserve font, size, and content.\n  var docStart = textProp.value;\n  docStart.applyFill = true;\n  // fillColor uses 0.0-1.0 float components, NOT 0-255.\n  docStart.fillColor = [1, 0, 0];\n  textProp.setValueAtTime(0, docStart);\n  // Create a second TextDocument for the end color.\n  // In-place mutation of the same object does NOT create a new keyframe --\n  // you must pass a distinct TextDocument to each setValueAtTime call.\n  var docEnd = textProp.value;\n  docEnd.applyFill = true;\n  docEnd.fillColor = [0, 0, 1];\n  textProp.setValueAtTime(2, docEnd);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "animate",
+      "text",
+      "fill",
+      "color",
+      "keyframing",
+      "source",
+      "different",
+      "textdocument",
+      "values",
+      "fillcolor",
+      "keyframe",
+      "animation"
+    ],
     "notes": "fillColor uses 0.0-1.0 floats (not 0-255). You must call setValueAtTime with a TextDocument object each time — setting a property on the existing doc and calling setValue() again does NOT create a new keyframe, it replaces the last one."
   },
   {
@@ -296,6 +511,19 @@ export const RECIPES: RecipeEntry[] = [
       "justification"
     ],
     "script": "app.beginUndoGroup(\"Create Text Layer\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var textLayer = comp.layers.addText(\"Welcome\");\n  var textProp = textLayer.property(\"ADBE Text Properties\").property(\"ADBE Text Document\");\n  var textDoc = textProp.value;\n  textDoc.font = \"ArialMT\";\n  textDoc.fontSize = 48;\n  textDoc.applyFill = true;\n  textDoc.fillColor = [1, 1, 1];\n  textDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\n  textProp.setValue(textDoc);\n  textLayer.property(\"ADBE Transform Group\").property(\"ADBE Anchor Point\").setValue([0, 0]);\n  textLayer.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2]);\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "create",
+      "text",
+      "font",
+      "size",
+      "fill",
+      "color",
+      "justification",
+      "addtext",
+      "textdocument",
+      "source",
+      "fontsize"
+    ],
     "notes": "Read TextDocument with .value, mutate the local object, then write it back with .setValue(). Set applyFill before fillColor."
   },
   {
@@ -311,6 +539,15 @@ export const RECIPES: RecipeEntry[] = [
       "set marker"
     ],
     "script": "app.beginUndoGroup(\"Add Marker\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // --- Layer marker ---\n  if (comp.selectedLayers.length > 0) {\n    var layer = comp.selectedLayers[0];\n    var mv = new MarkerValue(\"My Marker\");\n    mv.duration = 0; // 0 = point marker; set > 0 for a duration span\n    layer.property(\"Marker\").setValueAtTime(1.0, mv); // 1.0 = time in seconds\n  }\n  // --- Composition marker ---\n  // var compMv = new MarkerValue(\"Comp Marker\");\n  // comp.markerProperty.setValueAtTime(2.0, compMv);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\n// Read a marker's comment:\n// var comment = layer.property(\"Marker\").keyValue(1).comment;",
+    "terms": [
+      "marker",
+      "comment",
+      "composition",
+      "specific",
+      "time",
+      "comp",
+      "markervalue"
+    ],
     "notes": "MarkerValue constructor takes a comment string. Set mv.duration for a span marker (in seconds). Composition markers use comp.markerProperty.setValueAtTime() — this was unsupported before AE CC 2014 but is now standard. To read a marker: layer.property('Marker').keyValue(1).comment retrieves the first marker's comment."
   },
   {
@@ -326,6 +563,24 @@ export const RECIPES: RecipeEntry[] = [
       "safe comp access"
     ],
     "script": "app.beginUndoGroup(\"Script Name\");\ntry {\n  if (!app.project) {\n    throw new Error(\"No project is open.\");\n  }\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition in the Project panel.\");\n  }\n  // Safe to access comp.numLayers, comp.layers, comp.selectedLayers, etc.\n  var numLayers = comp.numLayers;\n  // ... your script logic here ...\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "active",
+      "item",
+      "guard",
+      "before",
+      "accessing",
+      "properties",
+      "instanceof",
+      "compitem",
+      "comp",
+      "check",
+      "composition",
+      "selected",
+      "null",
+      "project",
+      "safe",
+      "access"
+    ],
     "notes": "app.project.activeItem can be null (no project), a FootageItem, a FolderItem, or a CompItem. Accessing .numLayers or .layers on a null or non-comp item throws immediately. Always check app.project first, then instanceof CompItem. The .typeName string ('Footage', 'Composition', 'Folder') is an alternative filter but instanceof is preferred."
   },
   {
@@ -342,6 +597,21 @@ export const RECIPES: RecipeEntry[] = [
       "property group"
     ],
     "script": "app.beginUndoGroup(\"Walk Properties\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  walkProperties(layer, function(prop) {\n    // Example: log every property's matchName and current value\n    if (prop.numProperties === 0) {\n      // Leaf property -- safe to read .value\n      // $.writeln(prop.matchName + \": \" + prop.value);\n    }\n  });\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\nfunction walkProperties(propertyGroup, callback) {\n  var i;\n  for (i = 1; i <= propertyGroup.numProperties; i++) {\n    var prop = propertyGroup.property(i);\n    callback(prop);\n    if (prop.numProperties > 0) {\n      walkProperties(prop, callback);\n    }\n  }\n}",
+    "terms": [
+      "recursively",
+      "walk",
+      "properties",
+      "operate",
+      "leaf",
+      "matchname",
+      "recursive",
+      "property",
+      "loop",
+      "iterate",
+      "tree",
+      "numproperties",
+      "group"
+    ],
     "notes": "Use prop.matchName for stable property identification — it is locale-independent and survives layer renames. prop.name is locale-dependent and user-editable. PropertyType.INDEXED_GROUP and NAMED_GROUP have numProperties > 0; leaf properties have numProperties === 0. Reading .value on a group throws — always guard with numProperties check."
   },
   {
@@ -357,6 +627,22 @@ export const RECIPES: RecipeEntry[] = [
       "safe script boilerplate"
     ],
     "script": "app.beginUndoGroup(\"My Script Name\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // All mutations go here.\n  // Thrown errors will skip to catch, endUndoGroup still runs via finally.\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+    "terms": [
+      "wrap",
+      "mutations",
+      "beginundogroup",
+      "endundogroup",
+      "try",
+      "catch",
+      "finally",
+      "safe",
+      "error",
+      "handling",
+      "undo",
+      "group",
+      "script",
+      "boilerplate"
+    ],
     "notes": "Critical: in AE 2023+, calling app.beginUndoGroup() during ScriptUI panel initialization (on script load) throws 'Unknown Exception'. Defer all beginUndoGroup calls to user-triggered events (button clicks). Also: calling app.executeCommand() inside an open undo group silently opens a nested group, causing 'Undo group mismatch' warnings in AE 2023. Keep undo groups flat."
   }
 ];

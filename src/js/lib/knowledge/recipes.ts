@@ -3,6 +3,33 @@ import type { KnowledgeSource } from "./types";
 
 const MAX_RECIPE_CHARS = 6000;
 
+const TERM_STOP_WORDS = new Set([
+  "a", "an", "the", "to", "for", "with", "on", "in", "of", "it", "is",
+  "by", "from", "and", "or", "at", "as", "so", "up", "all", "into", "its",
+  "any", "be", "are", "how", "can", "this", "that", "each", "which",
+  "between", "per", "via", "new", "one", "two", "add", "set", "get", "use",
+  "do", "make",
+  // AE-generic terms that appear in almost every recipe and don't discriminate
+  "layer", "layers",
+]);
+
+function termTokenize(text: string): string[] {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 2 && !TERM_STOP_WORDS.has(t));
+  return [...new Set(tokens)];
+}
+
+function termScore(userTokens: Set<string>, recipe: RecipeEntry): number {
+  let score = 0;
+  for (const term of recipe.terms) {
+    if (userTokens.has(term)) score++;
+  }
+  return score;
+}
+
 const patterns: Array<{ regex: RegExp; recipe: RecipeEntry }> = [];
 for (const recipe of RECIPES) {
   for (const keyword of recipe.keywords) {
@@ -48,6 +75,24 @@ function matchRecipes(userMessage: string): RecipeEntry[] {
 
     matched.push(pattern.recipe);
     matchedIds.add(pattern.recipe.id);
+    charCount += formatted.length;
+  }
+
+  if (matched.length > 0) return matched;
+
+  // Fallback: term-overlap scoring when keyword matching finds nothing.
+  // Handles paraphrase mismatches where the user's words appear in recipe
+  // descriptions but not in the explicit keyword list.
+  const userTokens = new Set(termTokenize(userMessage));
+  const scored = RECIPES.map((r) => ({ recipe: r, score: termScore(userTokens, r) }))
+    .filter((x) => x.score >= 2)
+    .sort((a, b) => b.score - a.score);
+
+  for (const { recipe } of scored) {
+    const formatted = formatRecipe(recipe);
+    if (charCount > 0 && charCount + formatted.length > MAX_RECIPE_CHARS) break;
+    matched.push(recipe);
+    matchedIds.add(recipe.id);
     charCount += formatted.length;
   }
 

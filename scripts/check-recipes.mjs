@@ -247,4 +247,30 @@ assert(
   "injected recipes should stay within char budget (got " + manyMatchesContext.length + " chars)"
 );
 
-console.log("OK: recipes implementation injects for targeted prompts, stays out of effect-only prompts, and fits within the " + maxRecipeChars + "-char budget.");
+// -- fallback: near-miss prompts (description terms, no keyword match) --
+// "Wrap my script in an undo action with cleanup on failure" shares terms
+// with undo-group-try-finally's description ("wrap", "script", "undo", "cleanup")
+// but none of its keywords ("undo group", "undo wrap", "beginundogroup", etc.) match.
+
+const fallbackPrompt = "Wrap my script in an undo action with cleanup on failure";
+const undoRecipe = RECIPES.find((r) => r.id === "undo-group-try-finally");
+assert(undoRecipe, "undo-group-try-finally recipe is missing");
+
+// First, confirm keyword matching does NOT fire for this prompt.
+const fallbackDiagnostics = recipesKnowledge.getMessageContextDiagnostics(fallbackPrompt);
+assert(
+  fallbackDiagnostics.ids.includes("undo-group-try-finally"),
+  "near-miss prompt should inject undo-group-try-finally via term-overlap fallback"
+);
+
+const fallbackContext = recipesKnowledge.getMessageContext(fallbackPrompt);
+assert(
+  fallbackContext.includes(undoRecipe.description),
+  "fallback context should include the undo-group recipe description"
+);
+assert(
+  fallbackContext.includes("## Verified Action Recipes"),
+  "fallback context should include the recipes section header"
+);
+
+console.log("OK: recipes implementation injects for targeted prompts, stays out of effect-only prompts, fits within the " + maxRecipeChars + "-char budget, and catches near-miss paraphrases via term-overlap fallback.");
