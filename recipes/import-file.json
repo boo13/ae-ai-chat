@@ -1,0 +1,17 @@
+{
+  "id": "import-file",
+  "description": "Import a file into the project as Footage",
+  "keywords": [
+    "import file",
+    "importfile",
+    "import footage",
+    "import options",
+    "importoptions",
+    "add footage",
+    "import png",
+    "import video",
+    "import mp4"
+  ],
+  "script": "app.beginUndoGroup(\"Import File\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\n// Replace this path with the actual file path using forward slashes.\nvar filePath = \"/path/to/your/file.mp4\";\nvar file = new File(filePath);\nif (!file.exists) {\n  throw new Error(\"File not found: \" + filePath);\n}\nvar importOptions = new ImportOptions(file);\n// Use ImportAsType.COMP for layered files (PSD, AI) to preserve layers.\n// Use ImportAsType.FOOTAGE (the default) for video, image, and audio files.\nimportOptions.importAs = ImportAsType.FOOTAGE;\nvar footageItem = app.project.importFile(importOptions);\n// Optionally add the imported footage to the active comp as a new layer.\nvar newLayer = comp.layers.add(footageItem);\nnewLayer.startTime = 0;\napp.endUndoGroup();",
+  "notes": "Always use forward slashes in file paths (or a File object, which normalises them). Pick ImportAsType.COMP vs FOOTAGE deliberately for layered files like PSDs — COMP preserves layers, FOOTAGE flattens them."
+}

@@ -1,0 +1,14 @@
+{
+  "id": "copy-keyframes",
+  "description": "Copy all keyframes from one property to another",
+  "keywords": [
+    "copy keyframes",
+    "copy keys",
+    "keyframe copy",
+    "transfer keyframes",
+    "paste keyframes",
+    "duplicate keyframes"
+  ],
+  "script": "app.beginUndoGroup(\"Copy Keyframes\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nif (comp.selectedLayers.length < 1) {\n  throw new Error(\"Select at least one layer.\");\n}\nvar layer = comp.selectedLayers[0];\nvar srcProp = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\nvar dstProp = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n// Replace srcProp and dstProp with the actual source and destination properties.\n// Both properties must exist on accessible layers in the composition.\nvar keyCount = srcProp.numKeys;\nif (keyCount === 0) {\n  throw new Error(\"Source property has no keyframes.\");\n}\n// Snapshot all keyframe data before modifying anything.\nvar snapTimes = [];\nvar snapValues = [];\nvar snapInEase = [];\nvar snapOutEase = [];\nvar i;\nfor (i = 1; i <= keyCount; i++) {\n  snapTimes.push(srcProp.keyTime(i));\n  snapValues.push(srcProp.keyValue(i));\n  snapInEase.push(srcProp.keyInTemporalEase(i));\n  snapOutEase.push(srcProp.keyOutTemporalEase(i));\n}\n// Write keyframes to destination, then apply ease.\nfor (i = 0; i < keyCount; i++) {\n  dstProp.setValueAtTime(snapTimes[i], snapValues[i]);\n}\nfor (i = 0; i < keyCount; i++) {\n  dstProp.setTemporalEaseAtKey(i + 1, snapInEase[i], snapOutEase[i]);\n}\napp.endUndoGroup();",
+  "notes": "There is no native copyKeyframes() API. Always snapshot all keyframe data into arrays first, then write setValueAtTime, then re-apply ease — setting ease changes key indices, so re-apply in a second pass. Spatial properties also need setSpatialTangentsAtKey after the ease pass."
+}

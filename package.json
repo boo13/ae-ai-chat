@@ -24,9 +24,9 @@
     "debug": "cross-env SERVE_PANEL=true node ./node_modules/vite/bin/vite.js preview",
     "package": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true node ./node_modules/vite/bin/vite.js build --watch false",
     "symlink": "cross-env BOLT_ACTION=symlink node ./node_modules/vite/bin/vite.js",
-    "few-shot:check": "node scripts/check-few-shot-examples.mjs",
+    "recipes:check": "node scripts/check-recipes.mjs",
     "errors:summarize": "node scripts/error-log-summary.mjs",
-    "examples:export": "node scripts/export-example-scripts.mjs"
+    "recipes:export": "node scripts/export-recipe-scripts.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",

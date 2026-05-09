@@ -1,0 +1,17 @@
+{
+  "id": "text-layer-creation",
+  "description": "Create a text layer and set font, size, fill color, and justification",
+  "keywords": [
+    "text layer",
+    "addtext",
+    "textdocument",
+    "source text",
+    "font",
+    "font size",
+    "fontsize",
+    "fill color",
+    "justification"
+  ],
+  "script": "app.beginUndoGroup(\"Create Text Layer\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nvar textLayer = comp.layers.addText(\"Welcome\");\nvar textProp = textLayer.property(\"ADBE Text Properties\").property(\"ADBE Text Document\");\nvar textDoc = textProp.value;\ntextDoc.font = \"ArialMT\";\ntextDoc.fontSize = 48;\ntextDoc.applyFill = true;\ntextDoc.fillColor = [1, 1, 1];\ntextDoc.justification = ParagraphJustification.CENTER_JUSTIFY;\ntextProp.setValue(textDoc);\ntextLayer.property(\"ADBE Transform Group\").property(\"ADBE Anchor Point\").setValue([0, 0]);\ntextLayer.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2]);\napp.endUndoGroup();",
+  "notes": "Read TextDocument with .value, mutate the local object, then write it back with .setValue(). Set applyFill before fillColor."
+}

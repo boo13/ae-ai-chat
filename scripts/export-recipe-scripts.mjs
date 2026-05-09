@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Export generated few-shot example scripts to runnable .jsx files.
+ * Export generated recipe scripts to runnable .jsx files for AE testing.
  *
  * Defaults:
- *   source: src/js/lib/knowledge/data/examples.ts
- *   output: example-scripts/
+ *   source: src/js/lib/knowledge/data/recipes.ts
+ *   output: recipe-scripts/
  *
  * Usage:
- *   node scripts/export-example-scripts.mjs
- *   node scripts/export-example-scripts.mjs --source ../ae-ai-starter/Scripts/verified/examples
- *   node scripts/export-example-scripts.mjs --output /tmp/ae-example-scripts
+ *   node scripts/export-recipe-scripts.mjs
+ *   node scripts/export-recipe-scripts.mjs --source ./recipes
+ *   node scripts/export-recipe-scripts.mjs --output /tmp/ae-recipe-scripts
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
@@ -20,24 +20,24 @@ const sourceArgIdx = args.indexOf("--source");
 const outputArgIdx = args.indexOf("--output");
 const sourcePath =
   sourceArgIdx === -1
-    ? resolve("src/js/lib/knowledge/data/examples.ts")
+    ? resolve("src/js/lib/knowledge/data/recipes.ts")
     : resolve(args[sourceArgIdx + 1]);
 const outputDir =
-  outputArgIdx === -1 ? resolve("example-scripts") : resolve(args[outputArgIdx + 1]);
+  outputArgIdx === -1 ? resolve("recipe-scripts") : resolve(args[outputArgIdx + 1]);
 
 function fail(message) {
   console.error("Error: " + message);
   process.exit(1);
 }
 
-function extractExamplesFromTs(source) {
-  const marker = "export const EXAMPLES: ExampleEntry[] = ";
+function extractRecipesFromTs(source) {
+  const marker = "export const RECIPES: RecipeEntry[] = ";
   const start = source.indexOf(marker);
-  if (start === -1) fail("could not find EXAMPLES export in " + sourcePath);
+  if (start === -1) fail("could not find RECIPES export in " + sourcePath);
 
   let index = start + marker.length;
   while (/\s/.test(source[index] || "")) index += 1;
-  if (source[index] !== "[") fail("EXAMPLES export is not an array literal");
+  if (source[index] !== "[") fail("RECIPES export is not an array literal");
 
   const jsonStart = index;
   let depth = 0;
@@ -70,10 +70,10 @@ function extractExamplesFromTs(source) {
     }
   }
 
-  fail("could not parse EXAMPLES array");
+  fail("could not parse RECIPES array");
 }
 
-function readExamplesFromJsonDirectory(directory) {
+function readRecipesFromJsonDirectory(directory) {
   return readdirSync(directory)
     .filter((file) => file.endsWith(".json") && !file.startsWith("_"))
     .sort()
@@ -87,21 +87,21 @@ function readExamplesFromJsonDirectory(directory) {
     });
 }
 
-function readExamples() {
+function readRecipes() {
   if (!existsSync(sourcePath)) fail("source path not found: " + sourcePath);
 
   if (sourcePath.endsWith(".ts")) {
-    return extractExamplesFromTs(readFileSync(sourcePath, "utf-8"));
+    return extractRecipesFromTs(readFileSync(sourcePath, "utf-8"));
   }
 
-  return readExamplesFromJsonDirectory(sourcePath);
+  return readRecipesFromJsonDirectory(sourcePath);
 }
 
-function validateExample(example) {
-  if (!example || typeof example !== "object") fail("example must be an object");
-  if (typeof example.id !== "string" || example.id.trim() === "") fail("example id must be non-empty");
-  if (typeof example.script !== "string" || example.script.trim() === "") {
-    fail("example " + example.id + " has no script");
+function validateRecipe(recipe) {
+  if (!recipe || typeof recipe !== "object") fail("recipe must be an object");
+  if (typeof recipe.id !== "string" || recipe.id.trim() === "") fail("recipe id must be non-empty");
+  if (typeof recipe.script !== "string" || recipe.script.trim() === "") {
+    fail("recipe " + recipe.id + " has no script");
   }
 }
 
@@ -134,14 +134,14 @@ function wrapUndoGroup(script) {
   ].join("\n");
 }
 
-const examples = readExamples();
+const recipes = readRecipes();
 mkdirSync(outputDir, { recursive: true });
 
-for (const example of examples) {
-  validateExample(example);
-  const filePath = join(outputDir, example.id + ".jsx");
-  writeFileSync(filePath, wrapUndoGroup(example.script) + "\n");
+for (const recipe of recipes) {
+  validateRecipe(recipe);
+  const filePath = join(outputDir, recipe.id + ".jsx");
+  writeFileSync(filePath, wrapUndoGroup(recipe.script) + "\n");
   console.log("Wrote " + filePath);
 }
 
-console.log("Exported " + examples.length + " example scripts.");
+console.log("Exported " + recipes.length + " recipe scripts.");

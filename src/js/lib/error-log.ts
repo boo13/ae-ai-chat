@@ -35,7 +35,7 @@ export interface ErrorLogEntryInput {
   validationWarnings?: ScriptValidationWarning[];
   expressionErrors?: ExpressionError[];
   script: string;
-  injectedExampleIds: string[];
+  injectedRecipeIds: string[];
   triggerPath: TriggerPath;
 }
 
@@ -97,7 +97,7 @@ export function logFailure(input: ErrorLogEntryInput): void {
     const entry: ErrorLogEntry = {
       ts: new Date().toISOString(),
       ...input,
-      injectedExampleIds: input.injectedExampleIds.slice(),
+      injectedRecipeIds: input.injectedRecipeIds.slice(),
     };
 
     fs.appendFileSync(logPath, JSON.stringify(entry) + "\n", "utf8");

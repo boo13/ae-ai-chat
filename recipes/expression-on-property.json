@@ -1,0 +1,14 @@
+{
+  "id": "expression-on-property",
+  "description": "Set an initial property value, then assign an expression string",
+  "keywords": [
+    "expression",
+    "expressions",
+    "property expression",
+    "expression string",
+    "expression engine",
+    "wiggle"
+  ],
+  "script": "app.beginUndoGroup(\"Assign Expression\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nvar layer = comp.layers.addSolid([0.15, 0.18, 0.24], \"Expression Opacity\", comp.width, comp.height, comp.pixelAspect, comp.duration);\nvar opacity = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\nopacity.setValue(80);\nopacity.expression = \"var base = 80;\\nvar amount = 20;\\nbase + Math.sin(time * 6) * amount;\";\nif (opacity.expressionError !== \"\") {\n  throw new Error(opacity.expressionError);\n}\napp.endUndoGroup();",
+  "notes": "Use setValue or setValueAtTime for script-side values. Assign expressions as strings to .expression, then check expressionError."
+}

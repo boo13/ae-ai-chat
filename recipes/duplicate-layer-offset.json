@@ -1,0 +1,15 @@
+{
+  "id": "duplicate-layer-offset",
+  "description": "Duplicate a layer and offset the copy in comp time",
+  "keywords": [
+    "duplicate layer",
+    "duplicate",
+    "layer offset",
+    "offset in time",
+    "stagger",
+    "starttime",
+    "layer copy"
+  ],
+  "script": "app.beginUndoGroup(\"Duplicate and Offset Layer\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nif (comp.selectedLayers.length < 1) {\n  throw new Error(\"Select a layer to duplicate.\");\n}\nvar original = comp.selectedLayers[0];\n// duplicate() inserts the copy at index 1 (top of stack).\nvar copy = original.duplicate();\ncopy.name = original.name + \" copy\";\n// startTime slides the whole layer bar in comp time (not a trim handle).\n// .inPoint and .outPoint are trim positions — distinct from startTime.\nvar offsetSeconds = 0.5;\ncopy.startTime = original.startTime + offsetSeconds;\napp.endUndoGroup();",
+  "notes": "duplicate() always inserts the new layer at index 1. Use .startTime to slide the layer bar in comp time; do NOT confuse with .inPoint/.outPoint which are trim handles on the source."
+}

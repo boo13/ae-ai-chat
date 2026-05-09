@@ -1,0 +1,16 @@
+{
+  "id": "spatial-tangent-ease",
+  "description": "Set spatial ease on Position keyframes for a curved motion path",
+  "keywords": [
+    "spatial ease",
+    "spatial tangent",
+    "curved path",
+    "motion path",
+    "bezier path",
+    "position ease",
+    "setspatialatkey",
+    "setspatial"
+  ],
+  "script": "app.beginUndoGroup(\"Set Spatial Ease on Position\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nif (comp.selectedLayers.length < 1) {\n  throw new Error(\"Select a layer.\");\n}\nvar layer = comp.selectedLayers[0];\nvar position = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\n// Create at least two position keyframes first.\nvar cx = comp.width / 2;\nvar cy = comp.height / 2;\nposition.setValueAtTime(0, [cx - 300, cy]);\nposition.setValueAtTime(1, [cx, cy - 200]);\nposition.setValueAtTime(2, [cx + 300, cy]);\n// setSpatialTangentsAtKey only works on spatial (TwoD_SPATIAL / ThreeD_SPATIAL) properties.\n// It does NOT work on Scale, Opacity, or other non-spatial properties.\n// Disable auto-bezier and continuous bezier so AE does not override the tangents.\nvar keyIndex;\nfor (keyIndex = 1; keyIndex <= position.numKeys; keyIndex++) {\n  position.setSpatialAutoBezierAtKey(keyIndex, false);\n  position.setSpatialContinuousAtKey(keyIndex, false);\n  // inTangent and outTangent are [x, y] pixel offsets from the keyframe anchor.\n  position.setSpatialTangentsAtKey(keyIndex, [-100, 0], [100, 0]);\n}\napp.endUndoGroup();",
+  "notes": "setSpatialTangentsAtKey only works on TwoD_SPATIAL or ThreeD_SPATIAL properties (e.g. Position) — calling it on Scale or Opacity throws. Always call setSpatialAutoBezierAtKey(keyIndex, false) and setSpatialContinuousAtKey(keyIndex, false) first, otherwise AE overrides your tangents on the next frame render."
+}

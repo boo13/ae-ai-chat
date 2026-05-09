@@ -1,0 +1,15 @@
+{
+  "id": "parent-layer-by-name",
+  "description": "Parent one layer to another by name without a transform jump",
+  "keywords": [
+    "parent layer",
+    "parent",
+    "parenting",
+    "layer parent",
+    "setparentwithjump",
+    "parent by name",
+    "null parent"
+  ],
+  "script": "app.beginUndoGroup(\"Parent Layer by Name\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nvar childName = \"Title\";\nvar parentName = \"Background Box\";\nvar child = comp.layer(childName);\nif (!child) {\n  throw new Error(\"Layer not found: \" + childName);\n}\nvar parent = comp.layer(parentName);\nif (!parent) {\n  throw new Error(\"Layer not found: \" + parentName);\n}\n// Assigning .parent compensates transforms so the layer does not jump visually.\n// Use setParentWithJump(parent) if you want to preserve the raw transform values\n// and intentionally accept the visual snap (e.g. locking values before rigging).\nchild.parent = parent;\napp.endUndoGroup();",
+  "notes": "layer.parent = target auto-calculates a transform offset to prevent a visual jump. setParentWithJump(target) preserves the raw values and snaps visually — pick deliberately based on whether you want the child to stay in place or keep its current numeric values."
+}

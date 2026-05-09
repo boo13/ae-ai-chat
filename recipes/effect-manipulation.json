@@ -1,0 +1,14 @@
+{
+  "id": "effect-manipulation",
+  "description": "Add an effect, set multiple properties, and animate an effect property",
+  "keywords": [
+    "effect manipulation",
+    "effect properties",
+    "animate effect",
+    "setvalueattime",
+    "addproperty",
+    "multiple properties"
+  ],
+  "script": "app.beginUndoGroup(\"Animate Effect Properties\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nvar layer;\nif (comp.selectedLayers.length > 0) {\n  layer = comp.selectedLayers[0];\n} else {\n  layer = comp.layers.addSolid([0.2, 0.2, 0.2], \"Effect Target\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n}\nvar effects = layer.property(\"ADBE Effect Parade\");\nvar blur = effects.addProperty(\"ADBE Gaussian Blur 2\");\nvar blurriness = blur.property(\"ADBE Gaussian Blur 2-0001\");\nblurriness.setValueAtTime(0, 0);\nblurriness.setValueAtTime(1, 40);\nblur.property(\"ADBE Gaussian Blur 2-0002\").setValue(1);\nblur.property(\"ADBE Gaussian Blur 2-0003\").setValue(1);\napp.endUndoGroup();",
+  "notes": "Use addProperty with the verified effect matchName, then access individual effect properties by verified property matchName."
+}

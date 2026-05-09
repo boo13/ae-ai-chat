@@ -1,5 +1,5 @@
 import { effectsKnowledge } from "./effects";
-import { examplesKnowledge } from "./examples";
+import { recipesKnowledge } from "./recipes";
 import { gotchasKnowledge } from "./gotchas";
 import { layersKnowledge } from "./layers";
 import { shapesKnowledge } from "./shapes";
@@ -13,7 +13,7 @@ const sources: KnowledgeSource[] = [
   shapesKnowledge,
   textKnowledge,
   layersKnowledge,
-  examplesKnowledge,
+  recipesKnowledge,
 ];
 
 const REJECTION_LIST = VALIDATOR_REJECTIONS.map(
@@ -41,7 +41,7 @@ The panel static-checks generated scripts before running. The following patterns
 ${REJECTION_LIST}`;
 
 export interface KnowledgeContextDiagnostics {
-  exampleIds: string[];
+  recipeIds: string[];
 }
 
 export interface KnowledgeContextResult {
@@ -59,7 +59,7 @@ export function getKnowledgeContext(
   options?: { diagnostics?: boolean }
 ): string | KnowledgeContextResult {
   const sections: string[] = [];
-  const exampleIds = new Set<string>();
+  const recipeIds = new Set<string>();
 
   for (const source of sources) {
     const staticCtx = source.getStaticContext();
@@ -73,7 +73,7 @@ export function getKnowledgeContext(
         const diagnostics = source.getMessageContextDiagnostics?.(userMessage);
         if (diagnostics) {
           for (const id of diagnostics.ids) {
-            exampleIds.add(id);
+            recipeIds.add(id);
           }
         }
       }
@@ -87,7 +87,7 @@ export function getKnowledgeContext(
     return {
       text,
       diagnostics: {
-        exampleIds: Array.from(exampleIds),
+        recipeIds: Array.from(recipeIds),
       },
     };
   }

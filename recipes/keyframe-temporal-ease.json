@@ -1,0 +1,15 @@
+{
+  "id": "keyframe-temporal-ease",
+  "description": "Create keyframes and apply KeyframeEase with setTemporalEaseAtKey",
+  "keywords": [
+    "keyframe ease",
+    "keyframeease",
+    "temporal ease",
+    "settemporaleaseatkey",
+    "easing",
+    "ease keyframes",
+    "eased keyframes"
+  ],
+  "script": "app.beginUndoGroup(\"Ease Opacity Keyframes\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nvar layer = comp.layers.addSolid([1, 0.45, 0.1], \"Eased Opacity\", comp.width, comp.height, comp.pixelAspect, comp.duration);\nvar opacity = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\nopacity.setValueAtTime(0, 0);\nopacity.setValueAtTime(1, 100);\nvar easeIn = new KeyframeEase(0, 80);\nvar easeOut = new KeyframeEase(0, 80);\nopacity.setTemporalEaseAtKey(1, [easeIn], [easeOut]);\nopacity.setTemporalEaseAtKey(2, [easeIn], [easeOut]);\napp.endUndoGroup();",
+  "notes": "setTemporalEaseAtKey takes arrays of KeyframeEase objects. One-dimensional properties use one ease object per side."
+}

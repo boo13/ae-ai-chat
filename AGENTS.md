@@ -91,6 +91,8 @@ Full list in `src/js/lib/knowledge/data/gotchas.ts` (generated from the verified
 
 ## Verified Knowledge Corpus
 
+### Effects, properties, and gotchas
+
 The source of truth for AE effect match-names, property trees, and runtime gotchas is:
 
 ```
@@ -111,6 +113,26 @@ node scripts/generate-knowledge.mjs --source <path-to-verified>
 Outputs to `src/js/lib/knowledge/data/`. **Commit the generated `.ts` files** — no runtime dependency on the corpus. Re-run and commit whenever the upstream corpus changes.
 
 Trust provenance tags in the upstream effect JSON: `[VERIFIED]` and `[DOCS]` are reliable; verify `[LLM-GENERATED]` before relying on it.
+
+### Action recipes
+
+Recipes are **verified, composable action building blocks** — not reference-then-forget examples. The model is instructed to combine and adapt them to satisfy requests, treating them as authoritative primitives. Do not use the word "examples" to describe them.
+
+Recipes are authored as individual JSON files with schema `{id, description, keywords[], script, notes?}`. The `script` field must be ES3-compliant ExtendScript wrapped in `app.beginUndoGroup / endUndoGroup`.
+
+**Local authoring (MacBook):** A local `recipes/` directory at the repo root serves as the working corpus. Regenerate with:
+
+```bash
+node scripts/generate-knowledge.mjs --recipes-source ./recipes
+```
+
+**Upstream (Mac Studio):** The canonical home is `../ae-ai-starter/Scripts/verified/recipes/`. When back on the Mac Studio:
+1. Copy `recipes/*.json` to `../ae-ai-starter/Scripts/verified/recipes/`
+2. Re-run `node scripts/generate-knowledge.mjs` (no `--recipes-source` flag) to confirm the upstream path still produces the same output.
+
+**Tooling:**
+- `pnpm recipes:check` — smoke-tests keyword matching and injection for all recipe IDs
+- `pnpm recipes:export` — exports all recipe scripts to `recipe-scripts/*.jsx` for AE runtime testing
 
 ## Providers
 

@@ -77,7 +77,7 @@ export interface ChatContext {
   systemContext: string;
   projectRoot?: string;
   diagnostics: {
-    exampleIds: string[];
+    recipeIds: string[];
   };
 }
 

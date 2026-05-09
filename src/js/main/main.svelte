@@ -58,7 +58,7 @@
   let aiActionReady: boolean = $state(false);
   let aiActionWarnings: ScriptValidationWarning[] = $state([]);
   let aiActionErrors: ScriptValidationError[] = $state([]);
-  let aiActionInjectedExampleIds: string[] = $state([]);
+  let aiActionInjectedRecipeIds: string[] = $state([]);
   let aiActionOriginalUserMessage: string = $state("");
   let scriptViewerOpen: boolean = $state(false);
   let scriptViewerContent: string = $state("");
@@ -175,7 +175,7 @@
     expressionErrors?: ExpressionError[];
     validationErrors?: ScriptValidationError[];
     validationWarnings?: ScriptValidationWarning[];
-    injectedExampleIds: string[];
+    injectedRecipeIds: string[];
     triggerPath: TriggerPath;
     originalUserMessage?: string;
   }) {
@@ -192,7 +192,7 @@
       validationWarnings: input.validationWarnings,
       expressionErrors: input.expressionErrors,
       script: input.script,
-      injectedExampleIds: input.injectedExampleIds,
+      injectedRecipeIds: input.injectedRecipeIds,
       triggerPath: input.triggerPath,
     });
   }
@@ -214,7 +214,7 @@
     expressionErrors: ExpressionError[],
     validationErrors: ScriptValidationError[],
     validationWarnings: ScriptValidationWarning[],
-    logOptions: { errorKind: ErrorKind; injectedExampleIds: string[] }
+    logOptions: { errorKind: ErrorKind; injectedRecipeIds: string[] }
   ) {
     if (autoFixAborted) {
       addMessage("system", "Auto-fix cancelled.");
@@ -236,7 +236,7 @@
       expressionErrors,
       validationErrors,
       validationWarnings,
-      injectedExampleIds: logOptions.injectedExampleIds,
+      injectedRecipeIds: logOptions.injectedRecipeIds,
       triggerPath: "auto-run",
     });
 
@@ -268,7 +268,7 @@
     rememberError("");
     pendingScreenshot = null;
     aiActionReady = false;
-    aiActionInjectedExampleIds = [];
+    aiActionInjectedRecipeIds = [];
     aiActionOriginalUserMessage = "";
     setAiActionWarnings([]);
     setStatus(null);
@@ -439,7 +439,7 @@
             text: "Saving AI Action...",
           });
           const saved = saveAiAction(context.projectRoot, parsed.scriptContent, displayText);
-          aiActionInjectedExampleIds = context.diagnostics.exampleIds.slice();
+          aiActionInjectedRecipeIds = context.diagnostics.recipeIds.slice();
           aiActionOriginalUserMessage = autoFixOriginalPrompt || text;
           addMessage("system", "AI Action ready: " + saved.summary);
 
@@ -466,7 +466,7 @@
               [],
               {
                 errorKind: "validation",
-                injectedExampleIds: context.diagnostics.exampleIds,
+                injectedRecipeIds: context.diagnostics.recipeIds,
               }
             );
           } else {
@@ -499,7 +499,7 @@
                   warnings,
                   {
                     errorKind: "warning",
-                    injectedExampleIds: context.diagnostics.exampleIds,
+                    injectedRecipeIds: context.diagnostics.recipeIds,
                   }
                 );
               } else {
@@ -532,7 +532,7 @@
                     [],
                     {
                       errorKind: "runtime",
-                      injectedExampleIds: context.diagnostics.exampleIds,
+                      injectedRecipeIds: context.diagnostics.recipeIds,
                     }
                   );
                 } else if (exprErrors.length > 0) {
@@ -563,7 +563,7 @@
                     [],
                     {
                       errorKind: "expression",
-                      injectedExampleIds: context.diagnostics.exampleIds,
+                      injectedRecipeIds: context.diagnostics.recipeIds,
                     }
                   );
                 } else {
@@ -747,7 +747,7 @@
             errorString: errorStr,
             script: manualScript,
             expressionErrors: exprErrors,
-            injectedExampleIds: aiActionInjectedExampleIds,
+            injectedRecipeIds: aiActionInjectedRecipeIds,
             triggerPath: "manual-run",
             originalUserMessage: aiActionOriginalUserMessage,
           });
@@ -767,7 +767,7 @@
             errorString: exprSummary,
             script: manualScript,
             expressionErrors: exprErrors,
-            injectedExampleIds: aiActionInjectedExampleIds,
+            injectedRecipeIds: aiActionInjectedRecipeIds,
             triggerPath: "manual-run",
             originalUserMessage: aiActionOriginalUserMessage,
           });
@@ -784,7 +784,7 @@
           errorKind: "runtime",
           errorString: errMsg,
           script: manualScript,
-          injectedExampleIds: aiActionInjectedExampleIds,
+          injectedRecipeIds: aiActionInjectedRecipeIds,
           triggerPath: "manual-run",
           originalUserMessage: aiActionOriginalUserMessage,
         });

@@ -1,0 +1,16 @@
+{
+  "id": "text-color-keyframe",
+  "description": "Animate text fill color by keyframing Source Text with different TextDocument values",
+  "keywords": [
+    "text color",
+    "animate text color",
+    "text fill color",
+    "fillcolor",
+    "text keyframe",
+    "source text keyframe",
+    "color animation",
+    "text animation"
+  ],
+  "script": "app.beginUndoGroup(\"Animate Text Color\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) {\n  throw new Error(\"Open a composition first.\");\n}\nif (comp.selectedLayers.length < 1) {\n  throw new Error(\"Select a text layer.\");\n}\nvar layer = comp.selectedLayers[0];\nvar textProp = layer.property(\"ADBE Text Properties\").property(\"ADBE Text Document\");\n// Read the current TextDocument to preserve font, size, and content.\nvar docStart = textProp.value;\ndocStart.applyFill = true;\n// fillColor uses 0.0-1.0 float components, NOT 0-255.\ndocStart.fillColor = [1, 0, 0];\ntextProp.setValueAtTime(0, docStart);\n// Create a second TextDocument for the end color.\n// In-place mutation of the same object does NOT create a new keyframe —\n// you must pass a distinct TextDocument to each setValueAtTime call.\nvar docEnd = textProp.value;\ndocEnd.applyFill = true;\ndocEnd.fillColor = [0, 0, 1];\ntextProp.setValueAtTime(2, docEnd);\napp.endUndoGroup();",
+  "notes": "fillColor uses 0.0-1.0 floats (not 0-255). You must call setValueAtTime with a TextDocument object each time — setting a property on the existing doc and calling setValue() again does NOT create a new keyframe, it replaces the last one."
+}
