@@ -17,7 +17,7 @@
  * The generated files are committed to the repo — no runtime dependency on the corpus.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
@@ -162,6 +162,80 @@ function failInvalidRecipe(file, message) {
   process.exit(1);
 }
 
+function scriptCodeOnlyView(content) {
+  let result = "";
+  let i = 0;
+  const len = content.length;
+  while (i < len) {
+    if (content[i] === "/" && content[i + 1] === "/") {
+      const start = i;
+      while (i < len && content[i] !== "\n") i++;
+      result += content.slice(start, i).replace(/[^\n]/g, " ");
+      continue;
+    }
+    if (content[i] === "/" && content[i + 1] === "*") {
+      const start = i;
+      i += 2;
+      while (i < len) {
+        if (content[i] === "*" && content[i + 1] === "/") { i += 2; break; }
+        i++;
+      }
+      result += content.slice(start, i).replace(/[^\n]/g, " ");
+      continue;
+    }
+    if (content[i] === '"' || content[i] === "'" || content[i] === "`") {
+      const quote = content[i];
+      const start = i;
+      i++;
+      while (i < len) {
+        if (content[i] === "\\") { i += 2; continue; }
+        if (content[i] === quote) { i++; break; }
+        i++;
+      }
+      result += content.slice(start, i).replace(/[^\n]/g, " ");
+      continue;
+    }
+    result += content[i];
+    i++;
+  }
+  return result;
+}
+
+function validateRecipeScript(file, id, script) {
+  const errors = [];
+
+  const nonAsciiRe = /[^\x00-\x7f]/g;
+  let m;
+  while ((m = nonAsciiRe.exec(script)) !== null) {
+    errors.push(`non-ASCII character at offset ${m.index} (char: ${JSON.stringify(m[0])})`);
+  }
+
+  const code = scriptCodeOnlyView(script);
+
+  for (const { re, label } of [
+    { re: /\b(let|const)\s+/g, label: "let/const (use var)" },
+    { re: /=>/g, label: "arrow function => (use function() {})" },
+    { re: /`/g, label: "template literal (use string concatenation)" },
+    { re: /\.\.\./g, label: "spread/rest operator (...)" },
+  ]) {
+    re.lastIndex = 0;
+    if (re.test(code)) errors.push(`ES3 violation: ${label}`);
+  }
+
+  const beginCount = (code.match(/app\.beginUndoGroup\s*\(/g) || []).length;
+  const endCount = (code.match(/app\.endUndoGroup\s*\(/g) || []).length;
+  if (beginCount !== endCount && !(beginCount === 0 && endCount === 0)) {
+    errors.push(`unbalanced undo group: ${beginCount} beginUndoGroup() vs ${endCount} endUndoGroup()`);
+  }
+
+  if (errors.length > 0) {
+    for (const err of errors) {
+      console.error(`Error: Recipe "${id}" (${file}) failed script validation: ${err}`);
+    }
+    process.exit(1);
+  }
+}
+
 function indentScript(source) {
   return source
     .split(/\r?\n/)
@@ -231,7 +305,22 @@ function validateRecipe(file, example) {
     validated.notes = example.notes;
   }
 
+  validateRecipeScript(file, validated.id, validated.script);
+
   return validated;
+}
+
+function collectRecipeFiles(dir) {
+  const results = [];
+  for (const entry of readdirSync(dir).sort()) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      results.push(...collectRecipeFiles(full));
+    } else if (entry.endsWith(".json") && !entry.startsWith("_")) {
+      results.push(full);
+    }
+  }
+  return results;
 }
 
 function readRecipes() {
@@ -242,15 +331,13 @@ function readRecipes() {
     return [];
   }
 
-  const files = readdirSync(recipesDir)
-    .filter((file) => file.endsWith(".json") && !file.startsWith("_"))
-    .sort();
+  const files = collectRecipeFiles(recipesDir);
 
   const recipes = [];
   const seenIds = new Set();
 
-  for (const file of files) {
-    const filePath = join(recipesDir, file);
+  for (const filePath of files) {
+    const file = filePath.slice(recipesDir.length + 1);
 
     try {
       const raw = readFileSync(filePath, "utf-8");

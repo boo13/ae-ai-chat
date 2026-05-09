@@ -1,0 +1,15 @@
+{
+  "id": "replace-footage-source",
+  "description": "Replace footage source on a specific layer, or swap the project-panel item's source file",
+  "keywords": [
+    "replace footage",
+    "replacesource",
+    "swap footage",
+    "change source",
+    "replace file",
+    "update footage",
+    "relink footage"
+  ],
+  "script": "app.beginUndoGroup(\"Replace Footage\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer to replace its source.\");\n  }\n  var layer = comp.selectedLayers[0];\n\n  // Option A: replaceSource -- changes which project item THIS layer references.\n  // Other layers using the original item are unaffected.\n  var newItem = app.project.importFile(\n    new ImportOptions(new File(\"/path/to/new-file.mov\"))\n  );\n  layer.replaceSource(newItem, false); // false = don't shift keyframes\n\n  // Option B: FootageItem.replace() -- changes the source FILE for the project item.\n  // ALL layers referencing that footage item update automatically.\n  // layer.source.replace(new File(\"/path/to/new-file.mov\"));\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "Two distinct operations: replaceSource(newProjectItem, fixedToLayerTime) changes which project-panel item a specific layer references \u2014 other layers are unaffected. FootageItem.replace(file) changes the source file for the project item itself \u2014 all layers using that item update. The fixedToLayerTime boolean in replaceSource controls whether keyframes shift to maintain sync."
+}

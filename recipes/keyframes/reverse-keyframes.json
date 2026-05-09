@@ -1,0 +1,14 @@
+{
+  "id": "reverse-keyframes",
+  "description": "Reverse keyframes on a property by snapshotting then rewriting in reverse order",
+  "keywords": [
+    "reverse keyframes",
+    "flip keyframes",
+    "reverse animation",
+    "invert keyframes",
+    "time-reverse keyframes",
+    "backward animation"
+  ],
+  "script": "app.beginUndoGroup(\"Reverse Keyframes\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  // Replace with the actual property path to reverse.\n  var prop = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\n  var keyCount = prop.numKeys;\n  if (keyCount < 2) {\n    throw new Error(\"Property needs at least 2 keyframes to reverse.\");\n  }\n  // Snapshot everything before touching keyframes.\n  var i;\n  var snapTimes = [];\n  var snapValues = [];\n  var snapInEase = [];\n  var snapOutEase = [];\n  var snapInInterp = [];\n  var snapOutInterp = [];\n  for (i = 1; i <= keyCount; i++) {\n    snapTimes.push(prop.keyTime(i));\n    snapValues.push(prop.keyValue(i));\n    snapInEase.push(prop.keyInTemporalEase(i));\n    snapOutEase.push(prop.keyOutTemporalEase(i));\n    snapInInterp.push(prop.keyInInterpolationType(i));\n    snapOutInterp.push(prop.keyOutInterpolationType(i));\n  }\n  // Delete all keys from highest index down (renumbering safe).\n  for (i = keyCount; i >= 1; i--) {\n    prop.removeKey(i);\n  }\n  // Rewrite in reverse: original last key maps to original first time.\n  for (i = 0; i < keyCount; i++) {\n    var srcIdx = keyCount - 1 - i; // reversed source index\n    prop.setValueAtTime(snapTimes[i], snapValues[srcIdx]);\n  }\n  // Reapply eases with in/out swapped.\n  for (i = 1; i <= keyCount; i++) {\n    var srcIdx2 = keyCount - i; // reversed source index (0-based)\n    prop.setTemporalEaseAtKey(\n      i,\n      snapOutEase[srcIdx2], // original outEase becomes inEase\n      snapInEase[srcIdx2]   // original inEase becomes outEase\n    );\n  }\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "There is no native reverseKeyframes() API. Always delete keys from highest index downward — removeKey() renumbers all higher indices immediately. When rebuilding reversed keyframes, easeIn and easeOut swap roles: the original keyOutTemporalEase becomes the new keyInTemporalEase at the reversed position. Spatial properties also need setSpatialTangentsAtKey with tangents reversed."
+}

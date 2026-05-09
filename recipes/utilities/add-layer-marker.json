@@ -1,0 +1,15 @@
+{
+  "id": "add-layer-marker",
+  "description": "Add marker with a comment to a layer or composition at a specific time",
+  "keywords": [
+    "add marker",
+    "layer marker",
+    "comp marker",
+    "composition marker",
+    "markervalue",
+    "marker comment",
+    "set marker"
+  ],
+  "script": "app.beginUndoGroup(\"Add Marker\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // --- Layer marker ---\n  if (comp.selectedLayers.length > 0) {\n    var layer = comp.selectedLayers[0];\n    var mv = new MarkerValue(\"My Marker\");\n    mv.duration = 0; // 0 = point marker; set > 0 for a duration span\n    layer.property(\"Marker\").setValueAtTime(1.0, mv); // 1.0 = time in seconds\n  }\n  // --- Composition marker ---\n  // var compMv = new MarkerValue(\"Comp Marker\");\n  // comp.markerProperty.setValueAtTime(2.0, compMv);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\n// Read a marker's comment:\n// var comment = layer.property(\"Marker\").keyValue(1).comment;",
+  "notes": "MarkerValue constructor takes a comment string. Set mv.duration for a span marker (in seconds). Composition markers use comp.markerProperty.setValueAtTime() — this was unsupported before AE CC 2014 but is now standard. To read a marker: layer.property('Marker').keyValue(1).comment retrieves the first marker's comment."
+}

@@ -1,0 +1,16 @@
+{
+  "id": "add-mask-set-shape",
+  "description": "Add mask to a layer and set its shape vertices, mode, and feather",
+  "keywords": [
+    "add mask",
+    "mask shape",
+    "mask vertices",
+    "maskmode",
+    "mask feather",
+    "create mask",
+    "mask path",
+    "masking layer"
+  ],
+  "script": "app.beginUndoGroup(\"Add Mask\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select at least one layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  var newMask = layer.Masks.addProperty(\"Mask\");\n  newMask.maskMode = MaskMode.ADD;\n  newMask.inverted = false;\n  var maskPath = newMask.property(\"maskShape\");\n  var s = maskPath.value;\n  // Vertices are in layer space (centered at anchor point), not comp space.\n  s.vertices = [[0, 0], [200, 0], [200, 200], [0, 200]];\n  s.inTangents = [[0, 0], [0, 0], [0, 0], [0, 0]];\n  s.outTangents = [[0, 0], [0, 0], [0, 0], [0, 0]];\n  s.closed = true;\n  maskPath.setValue(s);\n  // Set feather (in pixels)\n  newMask.property(\"ADBE Mask Feather\").setValue(0);\n  // Optional: set mask opacity and expansion\n  // newMask.property(\"ADBE Mask Opacity\").setValue(100);\n  // newMask.property(\"ADBE Mask Expansion\").setValue(0);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "MaskMode values: NONE, ADD, SUBTRACT, INTERSECT, LIGHTEN, DARKEN, DIFFERENCE. Vertices are in layer space (centered at the layer's anchor point), not comp space — this differs from shape layer vertices. maskPath.value always returns a Shape() object. All three arrays (vertices, inTangents, outTangents) must have the same length for Bezier paths."
+}

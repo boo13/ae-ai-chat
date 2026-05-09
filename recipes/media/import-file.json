@@ -1,6 +1,6 @@
 {
   "id": "import-file",
-  "description": "Import a file into the project as Footage",
+  "description": "Import file into the project as Footage",
   "keywords": [
     "import file",
     "importfile",

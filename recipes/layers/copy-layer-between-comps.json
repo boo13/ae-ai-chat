@@ -1,0 +1,13 @@
+{
+  "id": "copy-layer-between-comps",
+  "description": "Copy layer to comp preserving all properties and keyframes",
+  "keywords": [
+    "copy layer to comp",
+    "copytocomp",
+    "move layer between comps",
+    "duplicate layer to composition",
+    "copy layer another comp"
+  ],
+  "script": "app.beginUndoGroup(\"Copy Layer to Comp\");\ntry {\n  var srcComp = app.project.activeItem;\n  if (!srcComp || !(srcComp instanceof CompItem)) {\n    throw new Error(\"Please select the source composition.\");\n  }\n  if (srcComp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer to copy.\");\n  }\n  var layer = srcComp.selectedLayers[0];\n  // Find target comp by name.\n  var targetComp = null;\n  var i;\n  for (i = 1; i <= app.project.numItems; i++) {\n    var item = app.project.item(i);\n    if (item instanceof CompItem && item.name === \"Target Comp Name\") {\n      targetComp = item;\n      break;\n    }\n  }\n  if (!targetComp) {\n    throw new Error(\"Target composition not found.\");\n  }\n  // copyToComp returns undefined, not the new layer.\n  // The copy becomes targetComp.layer(1) immediately after the call.\n  layer.copyToComp(targetComp);\n  var newLayer = targetComp.layer(1);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "copyToComp(targetComp) copies a layer with all properties, keyframes, and effects. It returns undefined \u2014 not the new layer. The copy is always inserted at index 1 (top of the stack) in the target comp. To reference the new layer immediately, use targetComp.layer(1) right after the call. The original layer is unchanged."
+}

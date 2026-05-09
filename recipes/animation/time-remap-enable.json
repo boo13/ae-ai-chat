@@ -1,0 +1,15 @@
+{
+  "id": "time-remap-enable",
+  "description": "Enable Time Remapping on a layer and add keyframes to remap source time",
+  "keywords": [
+    "time remap",
+    "timeremapenabled",
+    "time remapping",
+    "retime",
+    "speed ramp",
+    "adbe time remapping",
+    "source time"
+  ],
+  "script": "app.beginUndoGroup(\"Enable Time Remap\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  layer.timeRemapEnabled = true;\n  var timeRemap = layer.property(\"ADBE Time Remapping\");\n  // AE auto-creates 2 keyframes when enabling: at layer.inPoint and layer.outPoint.\n  // keyValue is source-time in seconds (where in the source to sample),\n  // NOT comp-time.\n  // Read auto-created keyframes before adding new ones:\n  var autoKeyCount = timeRemap.numKeys;\n  // Example: hold on frame 0 until 1s, then play from frame 0 again at 2s\n  // timeRemap.setValueAtTime(0, 0);      // comp 0s -> source 0s\n  // timeRemap.setValueAtTime(1.0, 0);    // comp 1s -> still source 0s (hold)\n  // timeRemap.setValueAtTime(2.0, 1.0);  // comp 2s -> source 1s\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "When timeRemapEnabled is first set to true, AE automatically creates two keyframes: one at layer.inPoint (value=0) and one at layer.outPoint (value=source duration). Time Remap values are source-time seconds \u2014 where in the source footage to sample \u2014 not comp-time positions. Always read the auto-created keyframes before adding more to avoid conflicts."
+}

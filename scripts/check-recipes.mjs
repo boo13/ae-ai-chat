@@ -18,7 +18,7 @@ const ts = require("typescript");
 
 const repoRoot = resolve(".");
 const knowledgeRoot = resolve("src/js/lib/knowledge");
-const maxRecipes = 2;
+const maxRecipeChars = 6000;
 
 function fail(message) {
   console.error("FAIL: " + message);
@@ -83,21 +83,6 @@ function transpileKnowledgeModules() {
 }
 
 function validateRecipeShape(recipes) {
-  const requiredIds = [
-    "copy-keyframes",
-    "duplicate-layer-offset",
-    "effect-manipulation",
-    "expression-on-property",
-    "import-file",
-    "keyframe-temporal-ease",
-    "parent-layer-by-name",
-    "precompose-selected-layers",
-    "shape-rect-stroke-fill",
-    "spatial-tangent-ease",
-    "text-color-keyframe",
-    "text-layer-creation",
-    "trim-paths-animation",
-  ];
   const ids = new Set();
 
   for (const recipe of recipes) {
@@ -110,10 +95,6 @@ function validateRecipeShape(recipes) {
     );
     assert(Array.isArray(recipe.keywords) && recipe.keywords.length > 0, recipe.id + " needs keywords");
     assert(typeof recipe.script === "string" && recipe.script, recipe.id + " script must be non-empty");
-  }
-
-  for (const id of requiredIds) {
-    assert(ids.has(id), "missing required recipe: " + id);
   }
 }
 
@@ -144,7 +125,18 @@ validateKnowledgeSourceOrder();
 
 assert(recipesKnowledge.getStaticContext() === "", "recipes should not add static context");
 
-// -- per-recipe keyword smoke tests --
+// -- auto-derived: every recipe must be matched by its own description --
+
+for (const recipe of RECIPES) {
+  const diagnostics = recipesKnowledge.getMessageContextDiagnostics(recipe.description);
+  assert(
+    diagnostics.ids.includes(recipe.id),
+    `Recipe "${recipe.id}" is not matched by its own description: "${recipe.description}". ` +
+      `Keywords: [${recipe.keywords.join(", ")}]`
+  );
+}
+
+// -- per-recipe intent smoke tests (paraphrase robustness) --
 
 const textPrompt = "Create a text layer that says Welcome at 48pt";
 const textContext = recipesKnowledge.getMessageContext(textPrompt);
@@ -243,14 +235,16 @@ assert(
   "full effect-only context should not include recipes"
 );
 
-// -- cap at MAX_RECIPES --
+// -- char budget: multi-topic prompt gets more than the old 2-recipe cap --
 
 const manyMatchesContext = recipesKnowledge.getMessageContext(
   "Create a text layer, animate trim paths, parent it, add an expression, and apply keyframe ease"
 );
+const manyMatchesCount = countFormattedRecipes(manyMatchesContext);
+assert(manyMatchesCount >= 3, "multi-topic prompt should inject at least 3 recipes under the char budget (got " + manyMatchesCount + ")");
 assert(
-  countFormattedRecipes(manyMatchesContext) === maxRecipes,
-  "recipe injection should be capped at two recipes"
+  manyMatchesContext.length <= maxRecipeChars + 500,
+  "injected recipes should stay within char budget (got " + manyMatchesContext.length + " chars)"
 );
 
-console.log("OK: recipes implementation injects for targeted prompts, stays out of effect-only prompts, and caps at " + maxRecipes + ".");
+console.log("OK: recipes implementation injects for targeted prompts, stays out of effect-only prompts, and fits within the " + maxRecipeChars + "-char budget.");

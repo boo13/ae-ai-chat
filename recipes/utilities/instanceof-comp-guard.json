@@ -1,0 +1,15 @@
+{
+  "id": "instanceof-comp-guard",
+  "description": "Active item guard before accessing layers or properties",
+  "keywords": [
+    "instanceof compitem",
+    "active item guard",
+    "comp guard",
+    "check active comp",
+    "no composition selected",
+    "null check project",
+    "safe comp access"
+  ],
+  "script": "app.beginUndoGroup(\"Script Name\");\ntry {\n  if (!app.project) {\n    throw new Error(\"No project is open.\");\n  }\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition in the Project panel.\");\n  }\n  // Safe to access comp.numLayers, comp.layers, comp.selectedLayers, etc.\n  var numLayers = comp.numLayers;\n  // ... your script logic here ...\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "app.project.activeItem can be null (no project), a FootageItem, a FolderItem, or a CompItem. Accessing .numLayers or .layers on a null or non-comp item throws immediately. Always check app.project first, then instanceof CompItem. The .typeName string ('Footage', 'Composition', 'Folder') is an alternative filter but instanceof is preferred."
+}

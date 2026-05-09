@@ -1,0 +1,15 @@
+{
+  "id": "undo-group-try-finally",
+  "description": "Wrap all mutations in beginUndoGroup/endUndoGroup with try/catch/finally for safe error handling",
+  "keywords": [
+    "undo group",
+    "beginundogroup",
+    "endundogroup",
+    "try catch finally",
+    "error handling",
+    "undo wrap",
+    "safe script boilerplate"
+  ],
+  "script": "app.beginUndoGroup(\"My Script Name\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // All mutations go here.\n  // Thrown errors will skip to catch, endUndoGroup still runs via finally.\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}",
+  "notes": "Critical: in AE 2023+, calling app.beginUndoGroup() during ScriptUI panel initialization (on script load) throws 'Unknown Exception'. Defer all beginUndoGroup calls to user-triggered events (button clicks). Also: calling app.executeCommand() inside an open undo group silently opens a nested group, causing 'Undo group mismatch' warnings in AE 2023. Keep undo groups flat."
+}

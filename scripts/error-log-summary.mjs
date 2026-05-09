@@ -120,3 +120,26 @@ if (invalidLines.length > 0) {
 }
 console.log("");
 printTable(rows);
+
+// -- zero-recipe failures: prompts where the corpus didn't help ---------------
+
+const zeroRecipeEntries = entries.filter(
+  (entry) => Array.isArray(entry.injectedRecipeIds) && entry.injectedRecipeIds.length === 0
+);
+
+console.log("");
+console.log("=== Zero-recipe failures (" + zeroRecipeEntries.length + "/" + entries.length + " actions) ===");
+console.log("Prompts where no recipe was injected — highest-signal input for new recipe authoring.");
+console.log("");
+
+if (zeroRecipeEntries.length === 0) {
+  console.log("  (none — the corpus matched every failed action)");
+} else {
+  const seen = new Set();
+  for (const entry of zeroRecipeEntries) {
+    const prompt = String(entry.originalUserMessage || "").replace(/\s+/g, " ").trim();
+    if (seen.has(prompt)) continue;
+    seen.add(prompt);
+    console.log("  - " + truncate(prompt, 120));
+  }
+}

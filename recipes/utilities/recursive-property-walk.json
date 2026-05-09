@@ -1,0 +1,16 @@
+{
+  "id": "recursive-property-walk",
+  "description": "Recursively walk all properties of a layer and operate on leaf properties by matchName",
+  "keywords": [
+    "recursive property",
+    "walk properties",
+    "loop properties",
+    "iterate properties",
+    "property tree",
+    "matchname",
+    "numproperties",
+    "property group"
+  ],
+  "script": "app.beginUndoGroup(\"Walk Properties\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  if (comp.selectedLayers.length === 0) {\n    throw new Error(\"Select a layer.\");\n  }\n  var layer = comp.selectedLayers[0];\n  walkProperties(layer, function(prop) {\n    // Example: log every property's matchName and current value\n    if (prop.numProperties === 0) {\n      // Leaf property -- safe to read .value\n      // $.writeln(prop.matchName + \": \" + prop.value);\n    }\n  });\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\nfunction walkProperties(propertyGroup, callback) {\n  var i;\n  for (i = 1; i <= propertyGroup.numProperties; i++) {\n    var prop = propertyGroup.property(i);\n    callback(prop);\n    if (prop.numProperties > 0) {\n      walkProperties(prop, callback);\n    }\n  }\n}",
+  "notes": "Use prop.matchName for stable property identification \u2014 it is locale-independent and survives layer renames. prop.name is locale-dependent and user-editable. PropertyType.INDEXED_GROUP and NAMED_GROUP have numProperties > 0; leaf properties have numProperties === 0. Reading .value on a group throws \u2014 always guard with numProperties check."
+}

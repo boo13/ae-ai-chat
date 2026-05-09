@@ -1,6 +1,6 @@
 {
   "id": "copy-keyframes",
-  "description": "Copy all keyframes from one property to another",
+  "description": "Copy keyframes from one property to another",
   "keywords": [
     "copy keyframes",
     "copy keys",

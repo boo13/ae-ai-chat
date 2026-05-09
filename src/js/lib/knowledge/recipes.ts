@@ -1,7 +1,7 @@
 import { RECIPES, type RecipeEntry } from "./data/recipes";
 import type { KnowledgeSource } from "./types";
 
-const MAX_RECIPES = 2;
+const MAX_RECIPE_CHARS = 6000;
 
 const patterns: Array<{ regex: RegExp; recipe: RecipeEntry }> = [];
 for (const recipe of RECIPES) {
@@ -37,15 +37,18 @@ function formatRecipe(recipe: RecipeEntry): string {
 function matchRecipes(userMessage: string): RecipeEntry[] {
   const matched: RecipeEntry[] = [];
   const matchedIds = new Set<string>();
+  let charCount = 0;
 
   for (const pattern of patterns) {
     if (matchedIds.has(pattern.recipe.id)) continue;
     if (!pattern.regex.test(userMessage)) continue;
 
+    const formatted = formatRecipe(pattern.recipe);
+    if (charCount > 0 && charCount + formatted.length > MAX_RECIPE_CHARS) break;
+
     matched.push(pattern.recipe);
     matchedIds.add(pattern.recipe.id);
-
-    if (matched.length === MAX_RECIPES) break;
+    charCount += formatted.length;
   }
 
   return matched;

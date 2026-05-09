@@ -1,0 +1,15 @@
+{
+  "id": "duplicate-composition",
+  "description": "Duplicate composition with deep copy to fully decouple nested comps",
+  "keywords": [
+    "duplicate composition",
+    "duplicate comp",
+    "copy composition",
+    "deep copy comp",
+    "replacesource",
+    "nested comp",
+    "clone composition"
+  ],
+  "script": "app.beginUndoGroup(\"Duplicate Composition\");\ntry {\n  var comp = app.project.activeItem;\n  if (!comp || !(comp instanceof CompItem)) {\n    throw new Error(\"Please select a composition.\");\n  }\n  // Shallow duplicate: nested comps remain shared references.\n  // Use deepDuplicateComp for a fully decoupled copy.\n  var compMap = {};\n  var result = deepDuplicateComp(comp, compMap);\n  result.name = comp.name + \" copy\";\n  alert(\"Created: \" + result.name);\n} catch (e) {\n  alert(\"Error: \" + e.toString());\n} finally {\n  app.endUndoGroup();\n}\n\nfunction deepDuplicateComp(comp, compMap) {\n  if (compMap[comp.id]) return compMap[comp.id];\n  var dup = comp.duplicate();\n  compMap[comp.id] = dup;\n  var i;\n  for (i = 1; i <= dup.numLayers; i++) {\n    var layer = dup.layer(i);\n    if (layer.source && layer.source instanceof CompItem) {\n      layer.replaceSource(deepDuplicateComp(layer.source, compMap), false);\n    }\n  }\n  return dup;\n}",
+  "notes": "comp.duplicate() is a shallow copy \u2014 nested comps inside remain shared references. Editing a nested comp affects both the original and the duplicate. deepDuplicateComp recursively duplicates each nested CompItem and uses replaceSource(newComp, false) to redirect layers. compMap keyed by comp.id prevents infinite recursion on shared nested comps."
+}
