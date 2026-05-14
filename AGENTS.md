@@ -14,7 +14,8 @@ src/js/         Svelte 5 + TypeScript panel UI
     knowledge/  Effect catalog, gotchas, validators
     providers/  AI provider implementations
     utils/      Shared helpers
-    actions.ts, ai-action.ts, context.ts, error-patterns.ts, provider-config.ts
+    actions.ts, ai-action.ts, auto-fix.ts, context.ts, error-log.ts, error-patterns.ts,
+    expression-rewriter.ts, provider-config.ts, runtime-environment.ts
   main/         Vite entry point → dist/cep/main/index.html
 src/jsx/        ExtendScript bridge (compiled for ES3)
   aeft/         AE evaluation helpers (aeft.ts, aeft-utils.ts)
@@ -36,9 +37,10 @@ pnpm build           # production build to dist/cep/
 pnpm symlink         # symlink dist/cep/ into AE's CEP extensions folder
 pnpm zxp             # package a signed .zxp
 pnpm debug           # open panel preview in the browser
+pnpm typecheck       # type-check Svelte + TS without building
 ```
 
-Run `npm run build` before `npm run symlink`. After build + symlink, restart AE and open via **Window → Extensions → AE AI Chat (dev)**. The packaged ZXP release appears as **AE AI Chat** — both can coexist.
+Run `pnpm build` before `pnpm symlink`. After build + symlink, restart AE and open via **Window → Extensions → AE AI Chat (dev)**. The packaged ZXP release appears as **AE AI Chat** — both can coexist.
 
 ## AI Action Protocol
 
@@ -126,8 +128,8 @@ Recipes are authored as individual JSON files with schema `{id, description, key
 node scripts/generate-knowledge.mjs --recipes-source ./recipes
 ```
 
-**Upstream (Mac Studio):** The canonical home is `../ae-ai-starter/Scripts/verified/recipes/`. When back on the Mac Studio:
-1. Copy `recipes/*.json` to `../ae-ai-starter/Scripts/verified/recipes/`
+**Upstream (Mac Studio):** The canonical home is `../ae-ai-starter/Scripts/recipes/`. When back on the Mac Studio:
+1. Copy `recipes/` subdirectories to `../ae-ai-starter/Scripts/recipes/` (e.g. `cp -r recipes/* ../ae-ai-starter/Scripts/recipes/`)
 2. Re-run `node scripts/generate-knowledge.mjs` (no `--recipes-source` flag) to confirm the upstream path still produces the same output.
 
 **Tooling:**
