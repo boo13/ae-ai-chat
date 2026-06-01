@@ -596,7 +596,7 @@ function ErrorBlock({ time, density, style }) {
           <DiagRow k="model"      v="haiku"/>
           <DiagRow k="sessionMode" v="new"/>
           <DiagRow k="pathLookupOnly" v="no"/>
-          <DiagRow k="env"        v={<span>HOME=<span style={{color:"var(--ae-text)"}}>/Users/randy</span></span>}/>
+          <DiagRow k="env"        v={<span>HOME=<span style={{color:"var(--ae-text)"}}>~</span></span>}/>
         </div>
       </details>
     </div>
