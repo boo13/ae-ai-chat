@@ -893,6 +893,48 @@ function buildCompSnapshot(comp: CompItem, maxLayers: number) {
   };
 }
 
+interface ProjectItemRow {
+  name: string;
+  type: string;
+  size?: string;
+  folder?: string;
+}
+
+function buildProjectItems(maxItems: number) {
+  var items: ProjectItemRow[] = [];
+  for (var i = 1; i <= app.project.numItems && items.length < maxItems; i++) {
+    var item = app.project.item(i);
+    var row: ProjectItemRow = { name: item.name, type: "item" };
+    try {
+      if (item instanceof CompItem) {
+        row.type = "comp";
+        row.size = item.width + "x" + item.height;
+      } else if (item instanceof FolderItem) {
+        row.type = "folder";
+      } else if (item instanceof FootageItem) {
+        row.type = "footage";
+        try {
+          if (item.mainSource instanceof SolidSource) row.type = "solid";
+        } catch (e) {}
+        try {
+          if (!item.hasVideo && item.hasAudio) row.type = "audio";
+        } catch (e) {}
+        try {
+          if (item.width) row.size = item.width + "x" + item.height;
+        } catch (e) {}
+      }
+    } catch (e) {}
+    try {
+      var parentFolder = (item as AVItem).parentFolder;
+      if (parentFolder && parentFolder.name !== "Root") {
+        row.folder = parentFolder.name;
+      }
+    } catch (e) {}
+    items.push(row);
+  }
+  return { total: app.project.numItems, items: items };
+}
+
 var SNAPSHOT_LAYER_LIMITS: LayerDetailLimits = {
   maxEffects: 10,
   maxEffectProperties: 16,
@@ -907,6 +949,7 @@ var SNAPSHOT_LAYER_LIMITS: LayerDetailLimits = {
 export const getContextSnapshot = () => {
   var data: any = {
     project: null,
+    items: null,
     comp: null,
     analysis: { summary: lastAnalysisSummary, updatedAt: lastAnalysisUpdatedAt },
     selectedLayers: { layers: [] },
@@ -915,6 +958,10 @@ export const getContextSnapshot = () => {
 
   try {
     data.project = getProjectInfo();
+  } catch (e) {}
+
+  try {
+    data.items = buildProjectItems(40);
   } catch (e) {}
 
   try {
@@ -955,6 +1002,9 @@ export const getContextSnapshot = () => {
       pruned = true;
     } else if (data.comp && data.comp.layers.length > 0) {
       data.comp.layers.pop();
+      pruned = true;
+    } else if (data.items && data.items.items.length > 0) {
+      data.items.items.pop();
       pruned = true;
     } else if (data.analysis && data.analysis.summary) {
       data.analysis.summary = "";

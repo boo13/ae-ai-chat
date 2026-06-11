@@ -101,8 +101,21 @@ interface SelectedPropertyDetails {
   properties: SelectedPropertyDetail[];
 }
 
+interface ProjectItemRow {
+  name: string;
+  type: string;
+  size?: string;
+  folder?: string;
+}
+
+interface ProjectItems {
+  total: number;
+  items: ProjectItemRow[];
+}
+
 interface ContextSnapshot {
   project: ProjectInfo | null;
+  items: ProjectItems | null;
   comp: CompInfo | null;
   analysis: { summary: string; updatedAt: string };
   selectedLayers: SelectedLayerDetails;
@@ -565,6 +578,21 @@ export async function buildContext(
     );
   } else {
     lines.push("No AE project is currently open.");
+  }
+
+  const projectItems = snapshot?.items || null;
+  if (projectItems && projectItems.items.length > 0) {
+    lines.push("");
+    lines.push("## Project Items");
+    for (const item of projectItems.items) {
+      const parts = [`  ${item.type}: ${item.name}`];
+      if (item.size) parts.push(item.size);
+      if (item.folder) parts.push(`in "${item.folder}"`);
+      lines.push(parts.join(" | "));
+    }
+    if (projectItems.total > projectItems.items.length) {
+      lines.push(`  ... and ${projectItems.total - projectItems.items.length} more items`);
+    }
   }
 
   if (compInfo) {
