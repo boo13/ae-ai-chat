@@ -285,9 +285,15 @@ async function sendClaudeMessage(
 
     const model = normalizeClaudeModel(options.model);
     const sessionId = options.sessionId || crypto.randomUUID();
-    const fullPrompt = options.systemContext
-      ? options.systemContext + "\n\n" + prompt
-      : prompt;
+    // The static knowledge corpus only needs to be sent once per session —
+    // resumed sessions already carry it in their history.
+    const contextPrefix = [
+      options.sessionId ? "" : options.staticContext || "",
+      options.systemContext || "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const fullPrompt = contextPrefix ? contextPrefix + "\n\n" + prompt : prompt;
     const startTime = Date.now();
 
     const cwd = resolveWorkingDirectory(options.projectRoot) || os.tmpdir();

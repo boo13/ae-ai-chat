@@ -13,7 +13,7 @@
     saveAiAction,
   } from "../lib/ai-action";
   import ScriptViewer from "../components/ScriptViewer.svelte";
-  import { buildContext } from "../lib/context";
+  import { buildContext, type LastActionResult } from "../lib/context";
   import { logFailure } from "../lib/error-log";
   import { getErrorHint } from "../lib/error-patterns";
   import ChatMessageComponent from "../components/ChatMessage.svelte";
@@ -75,6 +75,26 @@
   let autoFixOriginalPrompt: string = $state("");
   let autoFixAborted: boolean = $state(false);
   const AUTO_FIX_MAX = 3;
+
+  // Post-run verification: what the last successful AI Action changed in the
+  // active comp, included in the next message's context so the model can
+  // confirm the action did what it claimed.
+  let lastActionResult: LastActionResult | null = null;
+
+  function recordActionSuccess(runResult: unknown, summary: string): string[] {
+    const rawDiff = (runResult as any)?.stateDiff;
+    const stateDiff: string[] = Array.isArray(rawDiff) ? rawDiff.map(String) : [];
+    lastActionResult = { summary, ranAt: Date.now(), stateDiff };
+    return stateDiff;
+  }
+
+  function formatRunSuccessMessage(stateDiff: string[]): string {
+    if (stateDiff.length === 0) return "AI Action executed successfully.";
+    return (
+      "AI Action executed successfully.\nChanges:\n" +
+      stateDiff.map((note) => "  " + note).join("\n")
+    );
+  }
 
   function cancelStatusClear() {
     if (statusClearTimer) {
@@ -360,7 +380,8 @@
         phase: "preparing",
         text: "Reading AE context...",
       });
-      const context = await buildContext(text, pinned);
+      const context = await buildContext(text, pinned, lastActionResult ?? undefined);
+      lastActionResult = null;
       sessionProjectRoot = context.projectRoot || sessionProjectRoot;
 
       if (!didInitializeAiAction && sessionProjectRoot) {
@@ -375,6 +396,7 @@
         {
           model,
           systemContext: context.systemContext,
+          staticContext: context.staticContext,
           sessionId,
           imagePath,
           projectRoot: context.projectRoot,
@@ -567,12 +589,13 @@
                     }
                   );
                 } else {
+                  const stateDiff = recordActionSuccess(runResult, saved.summary);
                   setStatus({
                     phase: "completed",
                     text: "AI Action executed successfully.",
                     terminal: true,
                   });
-                  addMessage("system", "AI Action executed successfully.");
+                  addMessage("system", formatRunSuccessMessage(stateDiff));
                 }
               }
             } else {
@@ -774,7 +797,11 @@
         } else {
           setAiActionWarnings([]);
           aiActionErrors = [];
-          addMessage("system", "AI Action executed successfully.");
+          const stateDiff = recordActionSuccess(
+            runResult,
+            "Manual run of the saved AI Action"
+          );
+          addMessage("system", formatRunSuccessMessage(stateDiff));
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
