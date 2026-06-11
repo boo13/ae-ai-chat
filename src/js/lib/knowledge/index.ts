@@ -1,4 +1,8 @@
-import { effectsKnowledge } from "./effects";
+import {
+  effectsKnowledge,
+  formatEffectRecords,
+  matchEffectMatchNames,
+} from "./effects";
 import { recipesKnowledge } from "./recipes";
 import { gotchasKnowledge } from "./gotchas";
 import { layersKnowledge } from "./layers";
@@ -49,6 +53,84 @@ export interface KnowledgeContextResult {
   diagnostics: KnowledgeContextDiagnostics;
 }
 
+const MAX_PRESENT_EFFECT_RECORDS = 8;
+
+let cachedStaticContext: string | null = null;
+
+// Static knowledge is byte-stable across the session — providers place it
+// first in the system prompt so it can be served from the prompt cache.
+export function getStaticKnowledgeContext(): string {
+  if (cachedStaticContext !== null) return cachedStaticContext;
+
+  const sections: string[] = [];
+  for (const source of sources) {
+    const staticCtx = source.getStaticContext();
+    if (staticCtx) sections.push(staticCtx);
+  }
+  sections.push(RULES);
+
+  cachedStaticContext = sections.join("\n\n");
+  return cachedStaticContext;
+}
+
+// Per-message knowledge: recipes and effect records matched to the user's
+// request, plus verified records for effects already present on selected or
+// pinned layers (so the model has correct property matchNames even when the
+// user doesn't name the effect).
+export function getMessageKnowledgeContext(
+  userMessage?: string,
+  presentEffectMatchNames?: string[]
+): KnowledgeContextResult {
+  const sections: string[] = [];
+  const recipeIds = new Set<string>();
+
+  if (userMessage) {
+    for (const source of sources) {
+      if (!source.getMessageContext) continue;
+      const msgCtx = source.getMessageContext(userMessage);
+      if (!msgCtx) continue;
+
+      sections.push(msgCtx);
+
+      const diagnostics = source.getMessageContextDiagnostics?.(userMessage);
+      if (diagnostics) {
+        for (const id of diagnostics.ids) {
+          recipeIds.add(id);
+        }
+      }
+    }
+  }
+
+  if (presentEffectMatchNames && presentEffectMatchNames.length > 0) {
+    const alreadyMatched = userMessage
+      ? matchEffectMatchNames(userMessage).matched
+      : new Set<string>();
+    const seen = new Set<string>();
+    const remaining: string[] = [];
+    for (const matchName of presentEffectMatchNames) {
+      if (!matchName || seen.has(matchName) || alreadyMatched.has(matchName)) continue;
+      seen.add(matchName);
+      remaining.push(matchName);
+      if (remaining.length >= MAX_PRESENT_EFFECT_RECORDS) break;
+    }
+
+    const blocks = formatEffectRecords(remaining);
+    if (blocks.length > 0) {
+      sections.push(
+        [
+          "## Verified Effect Records (effects present on selected/pinned layers)",
+          ...blocks,
+        ].join("\n\n")
+      );
+    }
+  }
+
+  return {
+    text: sections.join("\n\n"),
+    diagnostics: { recipeIds: Array.from(recipeIds) },
+  };
+}
+
 export function getKnowledgeContext(userMessage?: string): string;
 export function getKnowledgeContext(
   userMessage: string | undefined,
@@ -58,38 +140,13 @@ export function getKnowledgeContext(
   userMessage?: string,
   options?: { diagnostics?: boolean }
 ): string | KnowledgeContextResult {
-  const sections: string[] = [];
-  const recipeIds = new Set<string>();
+  const message = getMessageKnowledgeContext(userMessage);
+  const text = [getStaticKnowledgeContext(), message.text]
+    .filter(Boolean)
+    .join("\n\n");
 
-  for (const source of sources) {
-    const staticCtx = source.getStaticContext();
-    if (staticCtx) sections.push(staticCtx);
-
-    if (userMessage && source.getMessageContext) {
-      const msgCtx = source.getMessageContext(userMessage);
-      if (msgCtx) {
-        sections.push(msgCtx);
-
-        const diagnostics = source.getMessageContextDiagnostics?.(userMessage);
-        if (diagnostics) {
-          for (const id of diagnostics.ids) {
-            recipeIds.add(id);
-          }
-        }
-      }
-    }
-  }
-
-  sections.push(RULES);
-
-  const text = sections.join("\n\n");
   if (options?.diagnostics) {
-    return {
-      text,
-      diagnostics: {
-        recipeIds: Array.from(recipeIds),
-      },
-    };
+    return { text, diagnostics: message.diagnostics };
   }
 
   return text;

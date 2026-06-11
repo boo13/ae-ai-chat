@@ -221,7 +221,9 @@ const recipesIndex = fullTextContext.indexOf("## Verified Action Recipes");
 const rulesIndex = fullTextContext.indexOf("## Rules for Script Generation");
 assert(effectsIndex !== -1 && recipesIndex !== -1, "full context should include effects and recipes");
 assert(effectsIndex < recipesIndex, "recipes should appear after reference data");
-assert(recipesIndex < rulesIndex, "recipes should appear before final generation rules");
+// Static knowledge (effects index, gotchas, rules) forms a byte-stable prefix
+// for prompt caching; message-matched recipes follow it.
+assert(rulesIndex !== -1 && rulesIndex < recipesIndex, "message-matched recipes should appear after the static rules block");
 
 // -- no injection for effect-only prompts --
 

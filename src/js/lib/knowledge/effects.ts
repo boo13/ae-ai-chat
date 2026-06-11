@@ -36,6 +36,30 @@ function formatEffect(detail: EffectDetail): string {
   return lines.join("\n");
 }
 
+export function matchEffectMatchNames(userMessage: string): {
+  matched: Set<string>;
+  displayNameMatches: Set<string>;
+} {
+  const matched = new Set<string>();
+  const displayNameMatches = new Set<string>();
+
+  for (const p of patterns) {
+    if (p.regex.test(userMessage)) {
+      matched.add(p.matchName);
+      if (p.isDisplayName) displayNameMatches.add(p.matchName);
+    }
+  }
+
+  return { matched, displayNameMatches };
+}
+
+export function formatEffectRecords(matchNames: string[]): string[] {
+  return matchNames
+    .map((mn) => EFFECTS_DETAIL[mn])
+    .filter(Boolean)
+    .map(formatEffect);
+}
+
 export const effectsKnowledge: KnowledgeSource = {
   id: "effects",
   getStaticContext() {
@@ -49,15 +73,7 @@ export const effectsKnowledge: KnowledgeSource = {
     ].join("\n");
   },
   getMessageContext(userMessage: string): string {
-    const matched = new Set<string>();
-    const displayNameMatches = new Set<string>();
-
-    for (const p of patterns) {
-      if (p.regex.test(userMessage)) {
-        matched.add(p.matchName);
-        if (p.isDisplayName) displayNameMatches.add(p.matchName);
-      }
-    }
+    const { matched, displayNameMatches } = matchEffectMatchNames(userMessage);
 
     if (matched.size === 0) return "";
 
@@ -72,10 +88,7 @@ export const effectsKnowledge: KnowledgeSource = {
       ].slice(0, 5);
     }
 
-    const blocks = selected
-      .map((mn) => EFFECTS_DETAIL[mn])
-      .filter(Boolean)
-      .map(formatEffect);
+    const blocks = formatEffectRecords(selected);
 
     return ["## Detailed Effect Records (for effects mentioned in your request)", ...blocks].join(
       "\n\n"
