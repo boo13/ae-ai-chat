@@ -183,7 +183,12 @@ function walkLeafProperties(root: any, visitor: (prop: Property) => boolean | vo
   return false;
 }
 
-function getEffectPropertyDetails(effect: PropertyGroup, maxProperties: number) {
+function getEffectPropertyDetails(
+  effect: PropertyGroup,
+  maxProperties: number,
+  maxValueChars?: number
+) {
+  var valueChars = maxValueChars || 120;
   var properties: { name: string; matchName: string; value: string }[] = [];
 
   walkLeafProperties(effect, function (prop) {
@@ -209,7 +214,7 @@ function getEffectPropertyDetails(effect: PropertyGroup, maxProperties: number) 
     properties.push({
       name: prop.name || "Unnamed Property",
       matchName: prop.matchName || "",
-      value: truncateString(value, 120),
+      value: truncateString(value, valueChars),
     });
   });
 
@@ -268,7 +273,12 @@ function getLayerKeyframedDetails(layer: Layer, maxProperties: number) {
   return keyframed;
 }
 
-function getLayerExpressionDetails(layer: Layer, maxProperties: number) {
+function getLayerExpressionDetails(
+  layer: Layer,
+  maxProperties: number,
+  maxExprChars?: number
+) {
+  var exprChars = maxExprChars || 200;
   var expressions: { name: string; expression: string }[] = [];
 
   for (var i = 1; i <= layer.numProperties; i++) {
@@ -305,7 +315,7 @@ function getLayerExpressionDetails(layer: Layer, maxProperties: number) {
 
       expressions.push({
         name: prop.name || "Unnamed Property",
-        expression: truncateString(expression, 200),
+        expression: truncateString(expression, exprChars),
       });
     });
 
@@ -540,89 +550,118 @@ export function getEffectsOnSelectedLayer(): {
   return result;
 }
 
-export const getSelectedLayerDetails = () => {
+interface LayerDetailLimits {
+  maxEffects: number;
+  maxEffectProperties: number;
+  maxValueChars: number;
+  maxKeyframed: number;
+  maxExpressions: number;
+  maxExprChars: number;
+}
+
+interface LayerDetail {
+  name: string;
+  index: number;
+  type: string;
+  effects: {
+    effectName: string;
+    effectMatchName: string;
+    properties: { name: string; matchName: string; value: string }[];
+  }[];
+  keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[];
+  expressions: { name: string; expression: string }[];
+}
+
+function buildLayerDetail(layer: Layer, limits: LayerDetailLimits): LayerDetail {
+  var effects: {
+    effectName: string;
+    effectMatchName: string;
+    properties: { name: string; matchName: string; value: string }[];
+  }[] = [];
+  try {
+    var effectParade = layer.property("ADBE Effect Parade");
+    if (effectParade) {
+      var effectCount = Math.min(effectParade.numProperties, limits.maxEffects);
+      for (var j = 1; j <= effectCount; j++) {
+        var effect = null;
+        try {
+          effect = effectParade.property(j);
+        } catch (e) {
+          effect = null;
+        }
+        if (!effect) continue;
+
+        effects.push({
+          effectName: effect.name || "Unnamed Effect",
+          effectMatchName: effect.matchName || "",
+          properties: getEffectPropertyDetails(
+            effect as PropertyGroup,
+            limits.maxEffectProperties,
+            limits.maxValueChars
+          ),
+        });
+      }
+    }
+  } catch (e) {}
+
+  return {
+    name: layer.name,
+    index: layer.index,
+    type: getSafeLayerType(layer),
+    effects: effects,
+    keyframed: getLayerKeyframedDetails(layer, limits.maxKeyframed),
+    expressions: getLayerExpressionDetails(layer, limits.maxExpressions, limits.maxExprChars),
+  };
+}
+
+function buildSelectedLayerDetailsData(
+  maxLayers: number,
+  limits: LayerDetailLimits,
+  maxSerializedSize: number
+) {
   var comp = getActiveComp();
   if (!comp) {
-    return { layers: [] };
+    return { layers: [] as LayerDetail[] };
   }
 
-  var MAX_LAYERS = 3;
-  var MAX_EFFECTS = 5;
-  var MAX_EFFECT_PROPERTIES = 8;
-  var MAX_KEYFRAMED_PROPERTIES = 20;
-  var MAX_EXPRESSIONS = 10;
-  var MAX_SERIALIZED_SIZE = 4096;
-
-  var layers: {
-    name: string;
-    index: number;
-    type: string;
-    effects: {
-      effectName: string;
-      effectMatchName: string;
-      properties: { name: string; matchName: string; value: string }[];
-    }[];
-    keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[];
-    expressions: { name: string; expression: string }[];
-  }[] = [];
-
-  var selectedCount = Math.min(comp.selectedLayers ? comp.selectedLayers.length : 0, MAX_LAYERS);
+  var layers: LayerDetail[] = [];
+  var selectedCount = Math.min(comp.selectedLayers ? comp.selectedLayers.length : 0, maxLayers);
   for (var i = 0; i < selectedCount; i++) {
     var layer = comp.selectedLayers[i];
     if (!layer) continue;
-
-    var effects: {
-      effectName: string;
-      effectMatchName: string;
-      properties: { name: string; matchName: string; value: string }[];
-    }[] = [];
-    try {
-      var effectParade = layer.property("ADBE Effect Parade");
-      if (effectParade) {
-        var effectCount = Math.min(effectParade.numProperties, MAX_EFFECTS);
-        for (var j = 1; j <= effectCount; j++) {
-          var effect = null;
-          try {
-            effect = effectParade.property(j);
-          } catch (e) {
-            effect = null;
-          }
-          if (!effect) continue;
-
-          effects.push({
-            effectName: effect.name || "Unnamed Effect",
-            effectMatchName: effect.matchName || "",
-            properties: getEffectPropertyDetails(effect as PropertyGroup, MAX_EFFECT_PROPERTIES),
-          });
-        }
-      }
-    } catch (e) {}
-
-    layers.push({
-      name: layer.name,
-      index: layer.index,
-      type: getSafeLayerType(layer),
-      effects: effects,
-      keyframed: getLayerKeyframedDetails(layer, MAX_KEYFRAMED_PROPERTIES),
-      expressions: getLayerExpressionDetails(layer, MAX_EXPRESSIONS),
-    });
+    layers.push(buildLayerDetail(layer, limits));
   }
 
   var result = { layers: layers };
-  while (result.layers.length > 0) {
+  while (maxSerializedSize > 0 && result.layers.length > 0) {
     var serialized = "";
     try {
       serialized = JSON.stringify(result);
     } catch (e) {
       serialized = "";
     }
-    if (!serialized || serialized.length <= MAX_SERIALIZED_SIZE) {
+    if (!serialized || serialized.length <= maxSerializedSize) {
       break;
     }
     result.layers.pop();
   }
 
   return result;
+}
+
+export const getSelectedLayerDetails = () => {
+  return buildSelectedLayerDetailsData(
+    3,
+    {
+      maxEffects: 5,
+      maxEffectProperties: 8,
+      maxValueChars: 120,
+      maxKeyframed: 20,
+      maxExpressions: 10,
+      maxExprChars: 200,
+    },
+    4096
+  );
 };
 
 export const getSelectedPropertyDetails = () => {
@@ -732,6 +771,486 @@ export const getSelectedPropertyDetails = () => {
   return { properties: properties };
 };
 
+function getLayerParentName(layer: Layer): string {
+  try {
+    if (layer.parent) return layer.parent.name;
+  } catch (e) {}
+  return "";
+}
+
+function countLayerEffects(layer: Layer): number {
+  try {
+    var effects = layer.property("ADBE Effect Parade");
+    return effects ? effects.numProperties : 0;
+  } catch (e) {}
+  return 0;
+}
+
+interface LayerStackRow {
+  index: number;
+  name: string;
+  type: string;
+  inPoint?: number;
+  outPoint?: number;
+  disabled?: boolean;
+  locked?: boolean;
+  threeD?: boolean;
+  parent?: string;
+  numEffects?: number;
+}
+
+function buildLayerStackRow(layer: Layer): LayerStackRow {
+  var row: LayerStackRow = {
+    index: layer.index,
+    name: layer.name,
+    type: getSafeLayerType(layer),
+  };
+  try {
+    row.inPoint = layer.inPoint;
+    row.outPoint = layer.outPoint;
+  } catch (e) {}
+  try {
+    if (!layer.enabled) row.disabled = true;
+  } catch (e) {}
+  try {
+    if (layer.locked) row.locked = true;
+  } catch (e) {}
+  try {
+    if ((layer as any).threeDLayer) row.threeD = true;
+  } catch (e) {}
+  var parentName = getLayerParentName(layer);
+  if (parentName) row.parent = parentName;
+  var numEffects = countLayerEffects(layer);
+  if (numEffects > 0) row.numEffects = numEffects;
+  return row;
+}
+
+function buildCompMarkers(comp: CompItem, maxMarkers: number) {
+  var markers: { time: number; comment: string }[] = [];
+  try {
+    var markerProp = comp.markerProperty;
+    if (!markerProp) return markers;
+    var count = Math.min(markerProp.numKeys, maxMarkers);
+    for (var i = 1; i <= count; i++) {
+      var comment = "";
+      try {
+        comment = (markerProp.keyValue(i) as MarkerValue).comment || "";
+      } catch (e) {}
+      markers.push({
+        time: markerProp.keyTime(i),
+        comment: truncateString(comment, 80),
+      });
+    }
+  } catch (e) {}
+  return markers;
+}
+
+function buildCompSnapshot(comp: CompItem, maxLayers: number) {
+  var selectedLayers: { name: string; type: string; index: number }[] = [];
+  try {
+    if (comp.selectedLayers) {
+      for (var s = 0; s < comp.selectedLayers.length; s++) {
+        var sel = comp.selectedLayers[s];
+        selectedLayers.push({
+          name: sel.name,
+          type: getSafeLayerType(sel),
+          index: sel.index,
+        });
+      }
+    }
+  } catch (e) {}
+
+  var layers: LayerStackRow[] = [];
+  var count = Math.min(comp.numLayers, maxLayers);
+  for (var j = 1; j <= count; j++) {
+    layers.push(buildLayerStackRow(comp.layer(j)));
+  }
+
+  var time = 0;
+  var workAreaStart = 0;
+  var workAreaDuration = 0;
+  try {
+    time = comp.time;
+  } catch (e) {}
+  try {
+    workAreaStart = comp.workAreaStart;
+    workAreaDuration = comp.workAreaDuration;
+  } catch (e) {}
+
+  return {
+    name: comp.name,
+    width: comp.width,
+    height: comp.height,
+    fps: comp.frameRate,
+    duration: comp.duration,
+    time: time,
+    workAreaStart: workAreaStart,
+    workAreaDuration: workAreaDuration,
+    markers: buildCompMarkers(comp, 20),
+    numLayers: comp.numLayers,
+    selectedLayers: selectedLayers,
+    layers: layers,
+  };
+}
+
+var SNAPSHOT_LAYER_LIMITS: LayerDetailLimits = {
+  maxEffects: 10,
+  maxEffectProperties: 16,
+  maxValueChars: 300,
+  maxKeyframed: 24,
+  maxExpressions: 12,
+  maxExprChars: 2000,
+};
+
+// Collects the full per-message context in one call and hands it to the
+// panel through a temp file, bypassing the ~10KB CEP bridge return limit.
+export const getContextSnapshot = () => {
+  var data: any = {
+    project: null,
+    comp: null,
+    analysis: { summary: lastAnalysisSummary, updatedAt: lastAnalysisUpdatedAt },
+    selectedLayers: { layers: [] },
+    selectedProperties: { properties: [] },
+  };
+
+  try {
+    data.project = getProjectInfo();
+  } catch (e) {}
+
+  try {
+    var comp = getActiveComp();
+    if (comp) data.comp = buildCompSnapshot(comp, 60);
+  } catch (e) {}
+
+  try {
+    data.selectedLayers = buildSelectedLayerDetailsData(5, SNAPSHOT_LAYER_LIMITS, 0);
+  } catch (e) {}
+
+  try {
+    data.selectedProperties = getSelectedPropertyDetails();
+  } catch (e) {}
+
+  var serialized = "";
+  try {
+    serialized = JSON.stringify(data);
+  } catch (e) {
+    return { error: "Failed to serialize context: " + e.toString() };
+  }
+
+  try {
+    var file = new File(Folder.temp.fsName + "/ae-ai-chat-context.json");
+    file.encoding = "UTF-8";
+    if (file.open("w")) {
+      file.write(serialized);
+      file.close();
+      return { file: file.fsName };
+    }
+  } catch (e) {}
+
+  // Fallback: return inline, pruning the biggest arrays to fit the bridge.
+  while (serialized.length > 8192) {
+    var pruned = false;
+    if (data.selectedLayers && data.selectedLayers.layers.length > 0) {
+      data.selectedLayers.layers.pop();
+      pruned = true;
+    } else if (data.comp && data.comp.layers.length > 0) {
+      data.comp.layers.pop();
+      pruned = true;
+    } else if (data.analysis && data.analysis.summary) {
+      data.analysis.summary = "";
+      pruned = true;
+    }
+    if (!pruned) break;
+    try {
+      serialized = JSON.stringify(data);
+    } catch (e) {
+      break;
+    }
+  }
+  return { inline: data };
+};
+
+function findCompById(compId: string): CompItem | null {
+  var id = parseInt(compId, 10);
+  if (!id) return null;
+  for (var i = 1; i <= app.project.numItems; i++) {
+    var item = app.project.item(i);
+    if (item instanceof CompItem && item.id === id) return item;
+  }
+  return null;
+}
+
+function findCompByName(name: string): CompItem | null {
+  if (!name) return null;
+  for (var i = 1; i <= app.project.numItems; i++) {
+    var item = app.project.item(i);
+    if (item instanceof CompItem && item.name === name) return item;
+  }
+  return null;
+}
+
+function findLayerByIndexOrName(comp: CompItem, index: number, name: string): Layer | null {
+  var layer: Layer | null = null;
+  if (index >= 1 && index <= comp.numLayers) {
+    layer = comp.layer(index);
+  }
+  if (layer && layer.name === name) return layer;
+  // Index may have shifted since the chip was pinned - fall back to name.
+  for (var i = 1; i <= comp.numLayers; i++) {
+    if (comp.layer(i).name === name) return comp.layer(i);
+  }
+  return layer;
+}
+
+var PIN_LAYER_LIMITS: LayerDetailLimits = {
+  maxEffects: 8,
+  maxEffectProperties: 12,
+  maxValueChars: 300,
+  maxKeyframed: 16,
+  maxExpressions: 8,
+  maxExprChars: 1200,
+};
+
+interface PinInput {
+  type: string;
+  label: string;
+  compId?: string;
+  layerIndex?: number;
+  compName?: string;
+  matchName?: string;
+  effectIndex?: number;
+  layerName?: string;
+}
+
+function resolveCompPin(pin: PinInput) {
+  var comp = findCompById(pin.compId || "") || findCompByName(pin.label);
+  if (!comp) {
+    return { pinType: "comp", label: pin.label, error: "Comp not found in project." };
+  }
+  var detail: any = buildCompSnapshot(comp, 30);
+  detail.pinType = "comp";
+  detail.label = pin.label;
+  return detail;
+}
+
+function resolveLayerPin(pin: PinInput) {
+  var comp = findCompByName(pin.compName || "") || getActiveComp();
+  if (!comp) {
+    return { pinType: "layer", label: pin.label, error: "Comp not found: " + pin.compName };
+  }
+  var layer = findLayerByIndexOrName(comp, pin.layerIndex || 0, pin.label);
+  if (!layer) {
+    return {
+      pinType: "layer",
+      label: pin.label,
+      error: "Layer not found in comp \"" + comp.name + "\".",
+    };
+  }
+  return {
+    pinType: "layer",
+    label: pin.label,
+    compName: comp.name,
+    layer: buildLayerDetail(layer, PIN_LAYER_LIMITS),
+  };
+}
+
+function resolveEffectPin(pin: PinInput) {
+  var comp = getActiveComp();
+  if (!comp) {
+    return { pinType: "effect", label: pin.label, error: "No active comp." };
+  }
+  var layer = findLayerByIndexOrName(comp, pin.layerIndex || 0, pin.layerName || "");
+  if (!layer) {
+    return {
+      pinType: "effect",
+      label: pin.label,
+      error: "Layer \"" + pin.layerName + "\" not found in comp \"" + comp.name + "\".",
+    };
+  }
+  var effects = layer.property("ADBE Effect Parade");
+  if (!effects) {
+    return {
+      pinType: "effect",
+      label: pin.label,
+      error: "Layer \"" + layer.name + "\" has no effects.",
+    };
+  }
+  var fx = null;
+  var effectIndex = pin.effectIndex || 0;
+  if (effectIndex >= 1 && effectIndex <= effects.numProperties) {
+    fx = effects.property(effectIndex);
+  }
+  if (!fx || fx.matchName !== pin.matchName) {
+    // Effect order may have changed - fall back to matchName lookup.
+    for (var j = 1; j <= effects.numProperties; j++) {
+      var candidate = effects.property(j);
+      if (candidate && candidate.matchName === pin.matchName) {
+        fx = candidate;
+        effectIndex = j;
+        break;
+      }
+    }
+  }
+  if (!fx) {
+    return {
+      pinType: "effect",
+      label: pin.label,
+      error: "Effect not found on layer \"" + layer.name + "\".",
+    };
+  }
+  var enabled = true;
+  try {
+    enabled = (fx as PropertyGroup).enabled;
+  } catch (e) {}
+  return {
+    pinType: "effect",
+    label: pin.label,
+    layerName: layer.name,
+    layerIndex: layer.index,
+    effectIndex: effectIndex,
+    effectName: fx.name,
+    effectMatchName: fx.matchName,
+    enabled: enabled,
+    properties: getEffectPropertyDetails(fx as PropertyGroup, 24, 300),
+  };
+}
+
+// Resolves pinned context chips to actual AE state so the model sees real
+// data (layer stacks, property values) instead of bare labels.
+export const getPinnedContextDetails = (pins: PinInput[]) => {
+  var items: any[] = [];
+  if (!pins || !pins.length) return { items: items };
+
+  var count = Math.min(pins.length, 6);
+  for (var i = 0; i < count; i++) {
+    var pin = pins[i];
+    if (!pin || !pin.type) continue;
+    try {
+      if (pin.type === "comp") {
+        items.push(resolveCompPin(pin));
+      } else if (pin.type === "layer") {
+        items.push(resolveLayerPin(pin));
+      } else if (pin.type === "effect") {
+        items.push(resolveEffectPin(pin));
+      }
+    } catch (e: any) {
+      items.push({
+        pinType: pin.type,
+        label: pin.label,
+        error: "Could not resolve: " + e.toString(),
+      });
+    }
+  }
+
+  var result = { items: items };
+  while (result.items.length > 0) {
+    var serialized = "";
+    try {
+      serialized = JSON.stringify(result);
+    } catch (e) {
+      serialized = "";
+    }
+    if (!serialized || serialized.length <= 8192) break;
+    result.items.pop();
+  }
+  return result;
+};
+
+interface RunSnapshot {
+  comp: string;
+  numLayers: number;
+  layers: { name: string; effects: number }[];
+}
+
+function buildRunSnapshot(): RunSnapshot | null {
+  var comp = getActiveComp();
+  if (!comp) return null;
+  var layers: { name: string; effects: number }[] = [];
+  var count = Math.min(comp.numLayers, 100);
+  for (var i = 1; i <= count; i++) {
+    var layer = comp.layer(i);
+    layers.push({ name: layer.name, effects: countLayerEffects(layer) });
+  }
+  return { comp: comp.name, numLayers: comp.numLayers, layers: layers };
+}
+
+function joinNames(names: string[], maxNames: number): string {
+  var shown = names.length > maxNames ? names.slice(0, maxNames) : names;
+  var joined = shown.join(", ");
+  if (names.length > maxNames) {
+    joined += ", and " + (names.length - maxNames) + " more";
+  }
+  return joined;
+}
+
+function diffRunSnapshots(before: RunSnapshot | null, after: RunSnapshot | null): string[] {
+  var notes: string[] = [];
+  if (!before && !after) return notes;
+  if (!before && after) {
+    notes.push("Active comp after run: " + after.comp);
+    return notes;
+  }
+  if (before && !after) {
+    notes.push("No active comp after the run.");
+    return notes;
+  }
+  if (!before || !after) return notes;
+  if (before.comp !== after.comp) {
+    notes.push("Active comp changed: \"" + before.comp + "\" -> \"" + after.comp + "\"");
+    return notes;
+  }
+
+  var counts: { [name: string]: number } = {};
+  var beforeEffects: { [name: string]: number } = {};
+  var i;
+  for (i = 0; i < before.layers.length; i++) {
+    var bl = before.layers[i];
+    counts[bl.name] = (counts[bl.name] || 0) + 1;
+    beforeEffects[bl.name] = bl.effects;
+  }
+
+  var added: string[] = [];
+  var effectNotes: string[] = [];
+  for (i = 0; i < after.layers.length; i++) {
+    var al = after.layers[i];
+    if (counts[al.name]) {
+      counts[al.name]--;
+      if (
+        typeof beforeEffects[al.name] === "number" &&
+        beforeEffects[al.name] !== al.effects &&
+        effectNotes.length < 10
+      ) {
+        effectNotes.push(
+          "Effects on \"" + al.name + "\": " + beforeEffects[al.name] + " -> " + al.effects
+        );
+        // Only report each layer name once even if duplicated.
+        beforeEffects[al.name] = al.effects;
+      }
+    } else {
+      added.push(al.name);
+    }
+  }
+
+  var removed: string[] = [];
+  for (var name in counts) {
+    if (counts[name] > 0) {
+      for (var r = 0; r < counts[name]; r++) {
+        removed.push(name);
+      }
+    }
+  }
+
+  if (added.length > 0) notes.push("Layers added: " + joinNames(added, 10));
+  if (removed.length > 0) notes.push("Layers removed: " + joinNames(removed, 10));
+  if (before.numLayers !== after.numLayers) {
+    notes.push("Layer count: " + before.numLayers + " -> " + after.numLayers);
+  }
+  for (i = 0; i < effectNotes.length; i++) {
+    notes.push(effectNotes[i]);
+  }
+  return notes;
+}
+
 export const runAnalysisScript = () => {
   var comp = getActiveComp();
   if (!comp) {
@@ -765,6 +1284,22 @@ export const runScriptFile = (filePath: string) => {
     return { error: "Script not found: " + filePath };
   }
 
+  var before: RunSnapshot | null = null;
+  try {
+    before = buildRunSnapshot();
+  } catch (_) {}
+
+  function captureStateDiff(): string[] {
+    var after: RunSnapshot | null = null;
+    try {
+      after = buildRunSnapshot();
+    } catch (_) {}
+    try {
+      return diffRunSnapshots(before, after);
+    } catch (_) {}
+    return [];
+  }
+
   try {
     app.beginUndoGroup("AI Chat: Run Script");
     //@ts-ignore
@@ -779,6 +1314,7 @@ export const runScriptFile = (filePath: string) => {
       message: exprErrors.length === 0 ? "Script executed successfully." : "Script ran but expression errors occurred.",
       result: String(result),
       expressionErrors: exprErrors,
+      stateDiff: captureStateDiff(),
     };
   } catch (e: any) {
     try { app.endUndoGroup(); } catch (_) {}
@@ -791,6 +1327,7 @@ export const runScriptFile = (filePath: string) => {
       errorLine: e.line || null,
       errorName: e.name || null,
       expressionErrors: catchExprErrors,
+      stateDiff: captureStateDiff(),
     };
   }
 };
