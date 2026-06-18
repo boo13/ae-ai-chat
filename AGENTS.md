@@ -59,6 +59,16 @@ The model can embed a single ExtendScript block in its reply:
 
 Parsing and validation live in `src/js/lib/ai-action.ts`. The validator (`src/js/lib/knowledge/validator.ts`) checks generated scripts against the verified effect catalog before saving.
 
+## Context Pipeline
+
+How AE state reaches the model on every message (`src/js/lib/context.ts`):
+
+- **One snapshot call.** `getContextSnapshot()` (`src/jsx/aeft/aeft.ts`) collects project info, active comp (incl. playhead, work area, comp markers, layer in/out points, parents, lock/enable/3D flags), selected-layer details, and selected properties in a single `evalTS` call. The JSON is written to a temp file and read back via Node `fs`, bypassing the ~10KB CEP bridge return limit — keep new context fields inside the snapshot, not as extra bridge calls. If the file write fails, an inline pruned payload is the fallback.
+- **Pinned chips resolve to data.** `getPinnedContextDetails()` turns pinned comp/layer/effect chips into actual layer stacks and effect property values (with name/matchName fallback when indices shift). Bare labels are only sent if resolution fails.
+- **Static vs. dynamic context.** `buildContext()` returns `staticContext` (byte-stable knowledge corpus: effect index, gotchas, property trees, rules, constraints, action protocol) and `systemContext` (per-turn AE state + message-matched recipes/effect records). The Claude API provider sends the static part as the first system block with a `cache_control` breakpoint (prompt cache); the CLI providers send it only on a session's first turn. **Never put per-turn data in the static part** — any byte change invalidates the cache.
+- **Present-effect records.** Verified effect records are injected not just for effects named in the user message, but for effects already present on selected/pinned layers (`getMessageKnowledgeContext` in `src/js/lib/knowledge/index.ts`).
+- **Post-run verification.** `runScriptFile()` diffs the active comp before/after execution; the panel shows the diff and feeds it into the next message's context as `## Last AI Action` so the model can verify the action actually changed something.
+
 ## ExtendScript (ES3) Constraints
 
 **Critical:** The panel generates scripts that run inside After Effects. AE's scripting host is based on ECMAScript 3.
@@ -135,6 +145,15 @@ node scripts/generate-knowledge.mjs --recipes-source ./recipes
 **Tooling:**
 - `pnpm recipes:check` — smoke-tests keyword matching and injection for all recipe IDs
 - `pnpm recipes:export` — exports all recipe scripts to `recipe-scripts/*.jsx` for AE runtime testing
+
+### Error-log feedback loop
+
+Dev installs log every AI Action failure (validation, runtime, expression) with the script and the injected recipe IDs to `.session/error-log.jsonl` (`src/js/lib/error-log.ts`). This corpus is the raw material for improving the knowledge base — mine it periodically:
+
+1. Run `node scripts/error-log-summary.mjs` to see recurring failure patterns.
+2. A repeated runtime pitfall → add it to the upstream `gotchas.md` and regenerate.
+3. A repeated "model couldn't compose X" failure → author a recipe for X.
+4. A failure that should have been caught before execution → add a validator rule (`src/js/lib/knowledge/validator.ts`).
 
 ## Providers
 

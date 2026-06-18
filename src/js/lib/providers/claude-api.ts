@@ -85,6 +85,20 @@ async function sendClaudeMessage(
     messages.push({ role: "user", content: prompt });
   }
 
+  // Static knowledge goes first with a cache breakpoint so repeat turns read
+  // it from the prompt cache; the per-turn AE state follows the breakpoint.
+  const systemBlocks: Anthropic.TextBlockParam[] = [];
+  if (options.staticContext) {
+    systemBlocks.push({
+      type: "text",
+      text: options.staticContext,
+      cache_control: { type: "ephemeral" },
+    });
+  }
+  if (options.systemContext) {
+    systemBlocks.push({ type: "text", text: options.systemContext });
+  }
+
   try {
     emitStatus({
       phase: "connecting",
@@ -92,8 +106,8 @@ async function sendClaudeMessage(
     });
     const stream = client.messages.stream({
       model: options.model,
-      max_tokens: 4096,
-      system: options.systemContext,
+      max_tokens: 16000,
+      system: systemBlocks.length > 0 ? systemBlocks : undefined,
       messages,
     });
 
@@ -179,7 +193,7 @@ export const claudeApiProvider: ProviderDefinition = {
   models: [
     { value: "claude-haiku-4-5", label: "Haiku" },
     { value: "claude-sonnet-4-6", label: "Sonnet" },
-    { value: "claude-opus-4-6", label: "Opus" },
+    { value: "claude-opus-4-8", label: "Opus" },
   ],
   supportsImages: true,
   async isAvailable() {

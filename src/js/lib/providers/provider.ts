@@ -37,7 +37,11 @@ export interface ProviderStatusUpdate {
 
 export interface SendMessageOptions {
   model: string;
+  // Per-turn AE state and message-matched knowledge.
   systemContext: string;
+  // Byte-stable knowledge corpus — API providers cache it, CLI providers
+  // send it only on the first turn of a session.
+  staticContext?: string;
   sessionId?: string;
   imagePath?: string;
   projectRoot?: string;

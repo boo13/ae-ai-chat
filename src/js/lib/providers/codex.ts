@@ -528,9 +528,15 @@ async function sendCodexMessage(
       return null;
     };
 
-    const fullPrompt = options.systemContext
-      ? options.systemContext + "\n\n" + prompt
-      : prompt;
+    // The static knowledge corpus only needs to be sent once per session —
+    // resumed sessions already carry it in their history.
+    const contextPrefix = [
+      options.sessionId ? "" : options.staticContext || "",
+      options.systemContext || "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    const fullPrompt = contextPrefix ? contextPrefix + "\n\n" + prompt : prompt;
     const startTime = Date.now();
     const diagnostics = buildLaunchDiagnostics(options);
     logLaunchDiagnostics(diagnostics);
