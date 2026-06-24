@@ -11,6 +11,7 @@
     revealAiActionInFinder,
     runAiAction,
     saveAiAction,
+    scanActionRisk,
   } from "../lib/ai-action";
   import ScriptViewer from "../components/ScriptViewer.svelte";
   import { buildContext, type LastActionResult } from "../lib/context";
@@ -544,6 +545,19 @@
                     errorKind: "warning",
                     injectedRecipeIds: context.diagnostics.recipeIds,
                   }
+                );
+              } else if (scanActionRisk(parsed.scriptContent).risky) {
+                const risk = scanActionRisk(parsed.scriptContent);
+                setStatus({
+                  phase: "completed",
+                  text: "AI Action needs your confirmation.",
+                  terminal: true,
+                });
+                addMessage(
+                  "system",
+                  "This AI Action was not run automatically because it " +
+                    risk.reasons.join(" and ") +
+                    ". Review the script, then click AI Action to run it."
                 );
               } else {
                 setStatus({
