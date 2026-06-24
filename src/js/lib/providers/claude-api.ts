@@ -194,6 +194,7 @@ export const claudeApiProvider: ProviderDefinition = {
     { value: "claude-haiku-4-5", label: "Haiku" },
     { value: "claude-sonnet-4-6", label: "Sonnet" },
     { value: "claude-opus-4-8", label: "Opus" },
+    { value: "claude-fable-5", label: "Fable" },
   ],
   supportsImages: true,
   async isAvailable() {
