@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { evalTS } from "../lib/utils/bolt";
+  import { evalTS, openLinkInBrowser } from "../lib/utils/bolt";
   import ProviderPicker from "../components/ProviderPicker.svelte";
   import { providerRegistry } from "../lib/provider-config";
   import {
@@ -23,6 +23,7 @@
   import PanelHeader from "../components/PanelHeader.svelte";
   import StreamingRow from "../components/StreamingRow.svelte";
   import Suggestions from "../components/Suggestions.svelte";
+  import UpdateBanner from "../components/UpdateBanner.svelte";
   import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
   import { buildAutoFixPrompt } from "../lib/auto-fix";
   import { getRuntimeEnvironment } from "../lib/runtime-environment";
@@ -35,6 +36,11 @@
   } from "../lib/providers/provider";
   import type { ContextChip } from "../../shared/shared";
   import { version } from "../../../package.json";
+  import {
+    checkForUpdate,
+    dismissUpdate,
+    type AvailableUpdate,
+  } from "../lib/update-check";
 
   const runtimeEnvironment = getRuntimeEnvironment();
   const runtimeEnvironmentTitle = (() => {
@@ -66,6 +72,7 @@
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
   let pendingContexts: ContextChip[] = $state([]);
+  let availableUpdate: AvailableUpdate | null = $state(null);
   let statusClearTimer: ReturnType<typeof setTimeout> | null = null;
   let statusElapsedTimer: ReturnType<typeof setInterval> | null = null;
   let statusElapsedMs: number = $state(0);
@@ -225,6 +232,20 @@
     });
     activeAbortController?.abort();
     activeAbortController = null;
+  }
+
+  function handleUpdateDismiss() {
+    if (!availableUpdate) return;
+    dismissUpdate(availableUpdate.version);
+    availableUpdate = null;
+  }
+
+  function handleUpdateDownload() {
+    if (availableUpdate) openLinkInBrowser(availableUpdate.downloadUrl);
+  }
+
+  function handleUpdateReleaseNotes() {
+    if (availableUpdate) openLinkInBrowser(availableUpdate.releaseUrl);
   }
 
   async function triggerAutoFix(
@@ -851,6 +872,10 @@
       })
       .catch(() => {});
 
+    checkForUpdate(version).then((update) => {
+      if (!disposed) availableUpdate = update;
+    });
+
     return () => {
       disposed = true;
       cancelStatusClear();
@@ -876,6 +901,15 @@
       onModelChange={(value) => (model = value)}
       onProviderChange={handleProviderSelect}
     />
+
+    {#if availableUpdate}
+      <UpdateBanner
+        update={availableUpdate}
+        onDownload={handleUpdateDownload}
+        onReleaseNotes={handleUpdateReleaseNotes}
+        onDismiss={handleUpdateDismiss}
+      />
+    {/if}
 
     <div class="chat-area" bind:this={chatArea} data-select-scope="chat-history">
       {#each messages as msg}
