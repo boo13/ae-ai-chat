@@ -571,7 +571,10 @@ async function sendCodexMessage(
     }
 
     if (options.sessionId) {
-      args.push(fullPrompt);
+      // Read the resumed prompt from stdin via the "-" sentinel, matching the
+      // first-turn `exec -` path. Passing it as an argv element risks exceeding
+      // the OS ARG_MAX limit on large per-turn context.
+      args.push("-");
     }
 
     const proc = child_process.spawn(
@@ -827,11 +830,6 @@ async function sendCodexMessage(
         is_error: true,
       });
     });
-
-    if (options.sessionId) {
-      proc.stdin.end();
-      return;
-    }
 
     proc.stdin.write(fullPrompt);
     proc.stdin.end();

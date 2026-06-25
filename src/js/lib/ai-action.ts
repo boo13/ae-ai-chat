@@ -320,6 +320,40 @@ export function parseAiActionResponse(content: string): ParsedAiActionResponse {
   };
 }
 
+export interface ActionRisk {
+  risky: boolean;
+  reasons: string[];
+}
+
+// High-signal ExtendScript APIs that reach outside normal AE editing — file
+// system, network, system commands, or dynamic code. A generated creative
+// action never needs these, so their presence is the strongest indicator that
+// untrusted project content (names, markers, expressions) steered the model
+// into emitting something that should not auto-run without a human look.
+const RISK_PATTERNS: { pattern: RegExp; reason: string }[] = [
+  // ExtendScript allows the constructor with or without `new` (File('~/x'),
+  // Folder('~/x')), so match the bare-call form too or the gate is bypassable.
+  { pattern: /\bnew\s+File\b|\bFile\s*\(/, reason: "accesses the file system" },
+  { pattern: /\bnew\s+Folder\b|\bFolder\s*\(/, reason: "accesses the file system" },
+  { pattern: /\bnew\s+Socket\b/, reason: "opens a network connection" },
+  { pattern: /\bsystem\s*\.\s*callSystem\b/, reason: "runs a system shell command" },
+  { pattern: /\$\s*\.\s*evalFile\b/, reason: "evaluates external code" },
+  { pattern: /\beval\s*\(/, reason: "evaluates code dynamically" },
+  { pattern: /\bapp\s*\.\s*executeCommand\b/, reason: "runs an arbitrary AE menu command" },
+  { pattern: /\bapp\s*\.\s*quit\b/, reason: "quits After Effects" },
+];
+
+export function scanActionRisk(script?: string): ActionRisk {
+  if (!script) return { risky: false, reasons: [] };
+  const reasons: string[] = [];
+  for (const { pattern, reason } of RISK_PATTERNS) {
+    if (pattern.test(script) && reasons.indexOf(reason) === -1) {
+      reasons.push(reason);
+    }
+  }
+  return { risky: reasons.length > 0, reasons };
+}
+
 export function clearAiAction(projectRoot?: string): string | null {
   if (!fs) return null;
 
