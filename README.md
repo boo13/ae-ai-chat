@@ -51,6 +51,7 @@ From the repo root:
 ```bash
 pnpm install
 pnpm build
+pnpm symlink
 ```
 
 Then restart After Effects and open the panel from **Window > Extensions > AE AI Chat (dev)**. (The signed ZXP release appears as **AE AI Chat** — both can coexist in the menu.)
@@ -58,12 +59,13 @@ Then restart After Effects and open the panel from **Window > Extensions > AE AI
 ## Scripts
 
 ```bash
-pnpm dev       # start the Vite dev server
-pnpm build     # build the CEP panel into dist/cep
-pnpm zxp       # package a ZXP build
-pnpm package   # alias for zxp
-pnpm debug     # preview the served panel in a browser
-pnpm symlink   # run the local CEP symlink action
+pnpm dev          # start the Vite dev server
+pnpm build        # build the CEP panel into dist/cep
+pnpm symlink      # symlink dist/cep into AE's CEP extensions folder
+pnpm zxp          # package a ZXP build
+pnpm package      # alias for zxp
+pnpm debug        # preview the served panel in a browser
+pnpm typecheck    # type-check without building
 ```
 
 ## Providers

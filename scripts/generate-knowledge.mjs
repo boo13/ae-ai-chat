@@ -18,7 +18,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
-import { dirname, join, resolve } from "path";
+import { dirname, join, relative, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -573,7 +573,7 @@ console.log(
 const recipes = readRecipes();
 const recipesSourceLabel =
   recipesSourceArgIdx !== -1
-    ? `${resolve(args[recipesSourceArgIdx + 1])} (${recipes.length} recipes)`
+    ? `${relative(process.cwd(), resolve(args[recipesSourceArgIdx + 1]))} (${recipes.length} recipes)`
     : `ae-ai-starter/Scripts/verified/recipes/ (${recipes.length} recipes)`;
 
 writeObjectModule(
