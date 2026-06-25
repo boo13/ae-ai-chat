@@ -90,6 +90,12 @@ See `prompts/sample-prompt.md` for a longer reference example.
 
 ---
 
+## Feedback
+
+Hit a bug, or have an idea? Click the **speech-bubble icon** in the panel header to open a pre-addressed email with your version and provider already filled in. Add a sentence about what happened and send — it comes straight to me.
+
+---
+
 ## License
 
 MIT

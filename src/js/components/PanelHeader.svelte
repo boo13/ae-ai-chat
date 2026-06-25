@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { providerRegistry } from "../lib/provider-config";
+  import { openFeedbackEmail } from "../lib/feedback";
   import type { RuntimeEnvironment } from "../lib/runtime-environment";
   import type { ProviderDefinition } from "../lib/providers/provider";
 
@@ -74,6 +75,15 @@
   function chooseModel(value: string) {
     onModelChange(value);
     isModelOpen = false;
+  }
+
+  function handleFeedback() {
+    openFeedbackEmail({
+      version,
+      providerLabel: activeProvider.displayName,
+      modelLabel: selectedModelLabel,
+      isDevInstall: runtimeEnvironment.isDevInstall,
+    });
   }
 
   function handleDocumentMouseDown(event: MouseEvent) {
@@ -183,6 +193,25 @@
   </div>
 
   <div class="panel-header__spacer"></div>
+
+  <div class="header-tooltip" data-tooltip="Send feedback">
+    <button
+      class="feedback-button"
+      type="button"
+      aria-label="Send feedback"
+      onclick={handleFeedback}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </button>
+  </div>
 
   <div class="model-menu" bind:this={modelMenuEl}>
     <button
@@ -401,6 +430,66 @@
   .panel-header__spacer {
     flex: 1;
     min-width: 8px;
+  }
+
+  .header-tooltip {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+  }
+
+  .header-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 50%;
+    z-index: 30;
+    width: max-content;
+    max-width: 180px;
+    padding: 6px 8px;
+    border: 1px solid var(--ae-line-2);
+    border-radius: 5px;
+    background: rgb(38,38,38);
+    color: var(--ae-text);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    opacity: 0;
+    pointer-events: none;
+    text-align: center;
+    transform: translate(-50%, -2px);
+    transition:
+      opacity 100ms ease,
+      transform 100ms ease;
+    white-space: pre-line;
+  }
+
+  .header-tooltip:hover::after,
+  .header-tooltip:focus-within::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .feedback-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--ae-text-3);
+    cursor: pointer;
+    flex: none;
+  }
+
+  .feedback-button:hover,
+  .feedback-button:focus-visible {
+    background: rgba(255,255,255,0.05);
+    color: var(--ae-text);
   }
 
   .model-menu {
