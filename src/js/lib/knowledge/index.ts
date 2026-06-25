@@ -103,7 +103,7 @@ export function getMessageKnowledgeContext(
 
   if (presentEffectMatchNames && presentEffectMatchNames.length > 0) {
     const alreadyMatched = userMessage
-      ? matchEffectMatchNames(userMessage).matched
+      ? matchEffectMatchNames(userMessage)
       : new Set<string>();
     const seen = new Set<string>();
     const remaining: string[] = [];

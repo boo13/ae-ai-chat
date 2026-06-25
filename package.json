@@ -22,6 +22,7 @@
     "typecheck": "svelte-check --tsconfig tsconfig-build.json && tsc -p tsconfig-build.json --noEmit",
     "zxp": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true node ./node_modules/vite/bin/vite.js build --watch false",
     "debug": "cross-env SERVE_PANEL=true node ./node_modules/vite/bin/vite.js preview",
+    "test": "node scripts/run-unit-tests.mjs",
     "package": "node ./node_modules/rimraf/bin.js dist/* && node ./node_modules/typescript/bin/tsc -p \"tsconfig-build.json\" && cross-env ZXP_PACKAGE=true node ./node_modules/vite/bin/vite.js build --watch false",
     "symlink": "cross-env BOLT_ACTION=symlink node ./node_modules/vite/bin/vite.js",
     "recipes:check": "node scripts/check-recipes.mjs",
