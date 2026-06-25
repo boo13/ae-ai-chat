@@ -1,8 +1,11 @@
 # AE AI Chat
 
-A chat panel that lives inside Adobe After Effects. Ask for changes in plain language and the AI can make them in your project for you — adding layers, applying effects, setting keyframes — not just describe the steps.
+A chat panel that lives inside Adobe After Effects. It reads your project and composition automatically — comp name, size, duration, frame rate, layer stack, selected layers, effects, and expressions — so you can ask about your *actual* project and get answers grounded in what's really there.
 
-It reads your project and composition context automatically — comp name, size, duration, frame rate, layer stack — so you don't have to describe your setup every prompt.
+Two ways people use it:
+
+- **Ask and troubleshoot.** "Why isn't this wiggle expression working?" / "How do I make this layer follow the null?" The AI answers using your real project content — and when there's a concrete fix (a broken expression, for example), it can apply it in place.
+- **Build.** "Add a text layer that says Hello and fade it in." The AI makes the change directly — adding layers, applying effects, setting keyframes — not just describing the steps.
 
 [![Screen recording of AI Chat drawing a star](screenshots/Screenrecord_AIChat_Star.gif)](screenshots/Screenrecord_AIChat_Star.mp4)
 
@@ -46,11 +49,19 @@ The Claude API key can be set as `ANTHROPIC_API_KEY` or saved in the panel. Imag
 
 ## Your first prompt
 
-Open a comp, open the panel, and type a plain request:
+Open a comp, open the panel, and type. There are two things you'll do most:
+
+**Ask about your project.** The panel already knows your comp, layers, effects, and expressions, so you can ask questions grounded in what's actually there:
+
+> Why isn't the wiggle expression on the selected layer working?
+
+You get an answer in plain language. If there's a clear fix — say, a broken expression — the AI applies it for you. Pure questions just get answered; nothing in your project changes unless the AI has an actual edit to make.
+
+**Ask for a change.** Describe what to build and the AI makes it:
 
 > Add a text layer that says "Hello", center it in the comp, and fade it in over the first second.
 
-The AI makes the change inside After Effects — you'll see the new layer appear in your comp. The **AI Action** button re-runs that last change if you want to repeat or tweak it. For getting better results on bigger builds, see [Writing Prompts](#writing-prompts).
+You'll see the new layer appear in your comp. Every change runs as a single undo step, so ⌘Z reverts it. The **AI Action** button re-runs the last change if you want to repeat or tweak it. For getting better results on bigger builds, see [Writing Prompts](#writing-prompts).
 
 ---
 
