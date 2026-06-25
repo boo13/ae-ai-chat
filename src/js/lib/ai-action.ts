@@ -331,8 +331,10 @@ export interface ActionRisk {
 // untrusted project content (names, markers, expressions) steered the model
 // into emitting something that should not auto-run without a human look.
 const RISK_PATTERNS: { pattern: RegExp; reason: string }[] = [
-  { pattern: /\bnew\s+File\b/, reason: "accesses the file system" },
-  { pattern: /\bnew\s+Folder\b/, reason: "accesses the file system" },
+  // ExtendScript allows the constructor with or without `new` (File('~/x'),
+  // Folder('~/x')), so match the bare-call form too or the gate is bypassable.
+  { pattern: /\bnew\s+File\b|\bFile\s*\(/, reason: "accesses the file system" },
+  { pattern: /\bnew\s+Folder\b|\bFolder\s*\(/, reason: "accesses the file system" },
   { pattern: /\bnew\s+Socket\b/, reason: "opens a network connection" },
   { pattern: /\bsystem\s*\.\s*callSystem\b/, reason: "runs a system shell command" },
   { pattern: /\$\s*\.\s*evalFile\b/, reason: "evaluates external code" },
