@@ -4,10 +4,12 @@ node_modules
 dist
 dist-ssr
 *.local
+*.local.md
 dist
 yarn-error.log
 .media
 .session
 example-scripts
+todos
 .env
 .env.local
