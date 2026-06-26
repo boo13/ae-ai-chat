@@ -41,6 +41,17 @@ export const VALIDATOR_REJECTIONS: Array<{ code: string; description: string }> 
     code: "UNDO_GROUP_MISMATCH",
     description: "mismatched beginUndoGroup() / endUndoGroup() call counts",
   },
+  {
+    code: "INVALID_GLOBAL",
+    description:
+      "undefined ExtendScript global — the layer blend-mode enum is BlendingMode (e.g. BlendingMode.SCREEN), not BlendMode",
+  },
+];
+
+// ExtendScript globals the model commonly misspells. The bad form is always a
+// ReferenceError at runtime (and aborts the whole script), so block it here.
+const INVALID_GLOBALS: Array<{ bad: string; good: string }> = [
+  { bad: "BlendMode", good: "BlendingMode" },
 ];
 
 interface SuggestedMatch {
@@ -328,6 +339,26 @@ function checkNonAscii(content: string): ScriptValidationError[] {
   ];
 }
 
+function checkInvalidGlobals(codeOnly: string): ScriptValidationError[] {
+  const errors: ScriptValidationError[] = [];
+  for (const { bad, good } of INVALID_GLOBALS) {
+    const re = new RegExp("\\b" + bad + "\\s*\\.", "g");
+    const occurrences: ScriptValidationOccurrence[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(codeOnly)) !== null) {
+      occurrences.push(getLineColumn(codeOnly, m.index));
+    }
+    if (occurrences.length > 0) {
+      errors.push({
+        code: "INVALID_GLOBAL",
+        message: `${bad} is not defined in ExtendScript — use ${good} (e.g. ${good}.SCREEN).`,
+        occurrences,
+      });
+    }
+  }
+  return errors;
+}
+
 function checkUndoGroupBalance(codeOnly: string): ScriptValidationError[] {
   const beginCount = (codeOnly.match(/app\.beginUndoGroup\s*\(/g) || []).length;
   const endCount = (codeOnly.match(/app\.endUndoGroup\s*\(/g) || []).length;
@@ -452,6 +483,7 @@ export function validateScript(content: string): ScriptValidationResult {
   const errors: ScriptValidationError[] = [
     ...checkNonAscii(content),       // Check original — non-ASCII anywhere breaks the file
     ...checkEs3Syntax(codeOnly),      // Check code-only — ignore strings/comments
+    ...checkInvalidGlobals(codeOnly),
     ...checkUndoGroupBalance(codeOnly),
   ];
 

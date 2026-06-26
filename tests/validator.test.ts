@@ -38,3 +38,35 @@ test("does not flag a variable value (no literal to validate)", () => {
   const script = 'fx.property("ADBE Fractal Noise-0001").setValue(myFractalType);';
   assert.equal(enumWarnings(script).length, 0);
 });
+
+test("blocks BlendMode (the enum is BlendingMode)", () => {
+  const script = [
+    "app.beginUndoGroup('x');",
+    "layer.blendingMode = BlendMode.SCREEN;",
+    "app.endUndoGroup();",
+  ].join("\n");
+  const errors = validateScript(script).errors.filter(
+    (e) => e.code === "INVALID_GLOBAL"
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /use BlendingMode/);
+});
+
+test("does not flag the correct BlendingMode global", () => {
+  const script = "layer.blendingMode = BlendingMode.SCREEN;";
+  const errors = validateScript(script).errors.filter(
+    (e) => e.code === "INVALID_GLOBAL"
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("does not flag BlendMode inside a string or comment", () => {
+  const script = [
+    '// BlendMode.SCREEN is wrong',
+    'var note = "BlendMode.SCREEN";',
+  ].join("\n");
+  const errors = validateScript(script).errors.filter(
+    (e) => e.code === "INVALID_GLOBAL"
+  );
+  assert.equal(errors.length, 0);
+});
