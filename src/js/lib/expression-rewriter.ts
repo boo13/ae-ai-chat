@@ -6,6 +6,11 @@ export interface ExpressionRewriteResult {
 export const EXPRESSION_HELPER_MARKER =
   "// AI expression capture (injected by panel)";
 
+// The helper assignment signature must also be present to treat a script as
+// already prepared — guards against a legitimate unprepared script that merely
+// contains the marker comment but not our injected helper.
+const EXPRESSION_HELPER_SIGNATURE = "$.global.__aiSetExpr = function";
+
 const EXPR_ASSIGN_RE =
   /^([ \t]*)(.*?)\.expression(?!Error|Enabled|Engine)\s*=\s*(?!=)(.+?)\s*;?\s*$/;
 
@@ -37,7 +42,10 @@ function splitTrailingLineComment(line: string): {
 export function rewriteExpressionAssignments(
   content: string
 ): ExpressionRewriteResult {
-  if (content.indexOf(EXPRESSION_HELPER_MARKER) !== -1) {
+  if (
+    content.indexOf(EXPRESSION_HELPER_MARKER) !== -1 &&
+    content.indexOf(EXPRESSION_HELPER_SIGNATURE) !== -1
+  ) {
     return { content, rewriteCount: 0 };
   }
 

@@ -53,6 +53,19 @@ test("preparation is byte-stable and does not rewrite the helper", () => {
   assert.match(second.content, /prop\.expression = expr;/);
 });
 
+test("the marker comment alone does not disable rewriting", () => {
+  // A legitimate, unprepared script that happens to contain the marker comment
+  // but not the injected helper must still be rewritten.
+  const input = [
+    EXPRESSION_HELPER_MARKER,
+    'opacity.expression = "wiggle(2, 20)";',
+  ].join("\n");
+  const result = rewriteExpressionAssignments(input);
+
+  assert.equal(result.rewriteCount, 1);
+  assert.match(result.content, /\$\.global\.__aiSetExpr\(opacity, "wiggle\(2, 20\)", 2\)/);
+});
+
 test("helper initializes independently and collects expression errors", () => {
   const context = {
     $: {
