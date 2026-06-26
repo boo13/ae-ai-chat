@@ -37,6 +37,7 @@ if (!existsSync(sourcePath)) {
 }
 
 const effectsDir = join(sourcePath, "effects");
+const calibrationDir = join(effectsDir, "calibration");
 const recipesSourceArgIdx = args.indexOf("--recipes-source");
 const recipesDir =
   recipesSourceArgIdx !== -1
@@ -384,6 +385,31 @@ function readRecipes() {
   return recipes;
 }
 
+// -- Load enum calibration sidecars ------------------------------------------
+// effects/calibration/<safe>.json holds empirically verified label->integer maps
+// (from tools/calibrate_effect.jsx). Keyed here by effect matchName so each
+// effect can pick up its enum data and unsupported-control notes.
+
+function readCalibration() {
+  const byMatchName = new Map();
+  if (!existsSync(calibrationDir)) return byMatchName;
+
+  for (const file of readdirSync(calibrationDir).sort()) {
+    if (!file.endsWith(".json") || file.startsWith("_")) continue;
+    try {
+      const data = JSON.parse(readFileSync(join(calibrationDir, file), "utf-8"));
+      if (!data?.matchName) continue;
+      byMatchName.set(data.matchName, data);
+    } catch {
+      console.warn(`Warning: Could not parse calibration sidecar ${file}`);
+    }
+  }
+  return byMatchName;
+}
+
+const calibration = readCalibration();
+let enumPropCount = 0;
+
 // -- Generate effect index ---------------------------------------------------
 
 const effectFiles = readdirSync(effectsDir)
@@ -416,22 +442,42 @@ for (const file of effectFiles) {
       ...(effect.knownAliases?.work || []).map((alias) => alias.toLowerCase()),
       effect.matchName.toLowerCase(),
     ]);
+    const calib = calibration.get(effect.matchName);
+    const enumsByProp = calib?.enums || {};
+
     const properties = (effect.properties || [])
       .filter((prop) => prop.valueType !== "NO_VALUE" && prop.name !== "")
-      .map((prop) => ({
-        index: prop.index,
-        name: prop.name,
-        matchName: prop.matchName,
-        valueType: prop.valueType,
-        defaultValue: prop.defaultValue ?? null,
-      }));
+      .map((prop) => {
+        const out = {
+          index: prop.index,
+          name: prop.name,
+          matchName: prop.matchName,
+          valueType: prop.valueType,
+          defaultValue: prop.defaultValue ?? null,
+        };
+        const verified = enumsByProp[prop.matchName];
+        if (verified?.values && Object.keys(verified.values).length > 0) {
+          out.enum = verified.values;
+          enumPropCount += 1;
+        }
+        return out;
+      });
+
+    // Effect-authored warnings, plus any calibration-flagged unsupported controls.
+    const warnings = [...(effect.warnings || [])];
+    for (const entry of calib?.unsupported || []) {
+      if (!entry?.label) continue;
+      warnings.push(
+        `"${entry.label}" is not scriptable${entry.note ? ` — ${entry.note}` : ""}`
+      );
+    }
 
     catalog[effect.matchName] = {
       displayName: effect.displayName,
       matchName: effect.matchName,
       keywords: Array.from(keywordSet),
       doNotUse: effect.knownAliases?.doNotUse || [],
-      warnings: effect.warnings || [],
+      warnings,
       properties,
     };
   } catch {
@@ -483,6 +529,7 @@ writeObjectModule(
     matchName: string;
     valueType: string;
     defaultValue: number | number[] | null;
+    enum?: Record<string, number | string>;
   }>;
 }
 
@@ -491,6 +538,11 @@ export const EFFECTS_DETAIL: Record<string, EffectDetail> = ${JSON.stringify(cat
 );
 
 console.log(`✓ effects-detail.ts — ${catalogEntries} effects`);
+if (calibration.size > 0) {
+  console.log(
+    `  + ${enumPropCount} verified enum maps from ${calibration.size} calibration sidecar(s)`
+  );
+}
 
 // -- Generate shape properties -----------------------------------------------
 

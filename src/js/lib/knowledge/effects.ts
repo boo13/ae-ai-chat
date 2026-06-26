@@ -45,9 +45,14 @@ function formatEffect(detail: EffectDetail): string {
     const def = Array.isArray(prop.defaultValue)
       ? `[${prop.defaultValue.join(", ")}]`
       : String(prop.defaultValue);
-    lines.push(
-      `  ${prop.index}. ${prop.name} | ${prop.matchName} | ${prop.valueType} | default: ${def}`
-    );
+    let line = `  ${prop.index}. ${prop.name} | ${prop.matchName} | ${prop.valueType} | default: ${def}`;
+    if (prop.enum) {
+      const options = Object.keys(prop.enum)
+        .map((label) => `${label}=${prop.enum![label]}`)
+        .join(", ");
+      if (options) line += ` | enum (verified): ${options}`;
+    }
+    lines.push(line);
   }
   if (detail.warnings.length > 0) {
     lines.push("Warnings:");

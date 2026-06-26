@@ -31,6 +31,8 @@ const RULES = `## Rules for Script Generation
 - TextDocument values must be read via .value, modified, and written back with .setValue().
 - Re-lookup layer indices AFTER all layer creation (index shifting — see Gotchas).
 - setValue() arrays MUST match the property's valueType exactly (4-element for COLOR, etc.).
+- Enum/dropdown properties take an INTEGER index, never a UI-label string. Use only integers listed as "enum (verified)" in the effect record. If the option you need is not listed as verified, do NOT guess the integer — tell the user it is unverified and ask them to set it manually, or leave the default.
+- If an effect record warns a control is "not scriptable" (CUSTOM_VALUE, e.g. Lumetri looks/curves/toning), do NOT fabricate a value — say so and have the user set it manually.
 - ES3 only: var, not let/const; no arrow functions; no template literals.
 - Wrap all changes in app.beginUndoGroup() / app.endUndoGroup().
 

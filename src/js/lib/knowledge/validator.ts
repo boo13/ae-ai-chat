@@ -58,6 +58,35 @@ const VARIABLE_ADD_REGEX =
 const FUZZY_SUGGESTION_THRESHOLD = 0.68;
 
 const validMatchNames = new Set(Object.keys(EFFECTS_DETAIL));
+
+interface EnumPropInfo {
+  effectDisplayName: string;
+  propName: string;
+  valueType: string;
+  enumValues?: Record<string, number | string>;
+}
+
+// All OneD (single-value) effect properties, keyed by property matchName.
+// OneD properties never accept a UI-label string via setValue(); those with a
+// verified `enum` map additionally constrain the accepted integers.
+const oneDPropsByMatchName = buildOneDPropMap();
+
+function buildOneDPropMap(): Map<string, EnumPropInfo> {
+  const map = new Map<string, EnumPropInfo>();
+  for (const detail of Object.values(EFFECTS_DETAIL)) {
+    for (const prop of detail.properties) {
+      if (prop.valueType !== "OneD") continue;
+      if (map.has(prop.matchName)) continue;
+      map.set(prop.matchName, {
+        effectDisplayName: detail.displayName,
+        propName: prop.name,
+        valueType: prop.valueType,
+        enumValues: prop.enum,
+      });
+    }
+  }
+  return map;
+}
 const catalog = Object.values(EFFECTS_DETAIL).map((detail) => {
   const aliases = buildAliases(detail);
   const doNotUseAliases = buildDoNotUseAliases(detail);
@@ -338,6 +367,85 @@ function checkExpressionSyntax(content: string): ScriptValidationWarning[] {
   return warnings;
 }
 
+const STRING_LITERAL_RE = /(['"])((?:\\.|(?!\1).)*)\1/;
+const NUMBER_LITERAL_RE = /-?\d+(?:\.\d+)?/;
+
+// Catches a literal value passed to a OneD/enum effect property:
+//   - a UI-label string ("Dynamic", "Cinespace 2383sRGB6bit") — never valid
+//   - an integer outside the verified enum set — likely a guessed value
+// Heuristic + statement-scoped: only fires when the property matchName and a
+// literal value appear in the same statement (covers both
+// `.property("MN").setValue(v)` and `helper(fx, "MN", v)` forms). Variable
+// values are ignored (no false positives), so coverage is best-effort.
+function checkEnumValues(content: string): ScriptValidationWarning[] {
+  const warnings: ScriptValidationWarning[] = [];
+  const seen = new Set<string>();
+  const mnRe = /(['"])(ADBE [^'"]+-\d{4}|CC [^'"]+-\d{4})\1/g;
+
+  let lineStart = 0;
+  for (const line of content.split("\n")) {
+    const code = line.replace(/\/\/.*$/, "");
+    mnRe.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = mnRe.exec(code)) !== null) {
+      const matchName = m[2];
+      const info = oneDPropsByMatchName.get(matchName);
+      if (!info) continue;
+
+      const afterIdx = m.index + m[0].length;
+      let rest = code.slice(afterIdx);
+      const semi = rest.indexOf(";");
+      if (semi !== -1) rest = rest.slice(0, semi);
+
+      const strMatch = rest.match(STRING_LITERAL_RE);
+      const numMatch = rest.match(NUMBER_LITERAL_RE);
+      const strIdx = strMatch ? rest.indexOf(strMatch[0]) : Infinity;
+      const numIdx = numMatch ? rest.indexOf(numMatch[0]) : Infinity;
+      if (strIdx === Infinity && numIdx === Infinity) continue;
+
+      const optionList = info.enumValues
+        ? Object.keys(info.enumValues)
+            .map((label) => `${label}=${info.enumValues![label]}`)
+            .join(", ")
+        : "";
+      const occurrence = getLineColumn(content, lineStart + m.index);
+
+      let message: string | null = null;
+      if (strIdx < numIdx) {
+        message =
+          `Warning: ${info.effectDisplayName} "${info.propName}" (${matchName}) is a numeric property — ` +
+          `pass an integer, not a UI label string "${strMatch![2]}".` +
+          (optionList ? ` Verified options: ${optionList}.` : "");
+      } else if (info.enumValues) {
+        const value = Number(numMatch![0]);
+        const verified = Object.values(info.enumValues).some(
+          (v) => Number(v) === value
+        );
+        if (!verified) {
+          message =
+            `Warning: ${value} is not a verified value for ${info.effectDisplayName} "${info.propName}" ` +
+            `(${matchName}). Use a verified option or leave the default — do not guess.` +
+            (optionList ? ` Verified options: ${optionList}.` : "");
+        }
+      }
+
+      if (!message) continue;
+      const key = `${matchName}::${message}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      warnings.push({
+        code: "ENUM_VALUE",
+        invalidMatchName: matchName,
+        message,
+        occurrences: [occurrence],
+      });
+    }
+    lineStart += line.length + 1;
+  }
+
+  return warnings;
+}
+
 export function validateScript(content: string): ScriptValidationResult {
   const codeOnly = codeOnlyView(content);
 
@@ -350,6 +458,7 @@ export function validateScript(content: string): ScriptValidationResult {
   const warnings: ScriptValidationWarning[] = [
     ...checkEffectMatchNames(content),
     ...checkExpressionSyntax(content),
+    ...checkEnumValues(content),
   ];
 
   return { errors, warnings };

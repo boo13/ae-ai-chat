@@ -37,6 +37,34 @@ test("film-damage context includes the requested detailed effect records", () =>
   }
 });
 
+test("emits verified enum options in the effect record when present", () => {
+  const detail = EFFECTS_DETAIL["ADBE Fractal Noise"];
+  const prop = detail.properties.find(
+    (p) => p.matchName === "ADBE Fractal Noise-0001"
+  );
+  assert.ok(prop, "Fractal Type property exists");
+
+  prop!.enum = { Basic: 1, Dynamic: 4 };
+  try {
+    const context =
+      effectsKnowledge.getMessageContext?.(
+        "Apply the Fractal Noise effect and set Fractal Type"
+      ) || "";
+    assert.match(context, /enum \(verified\): Basic=1, Dynamic=4/);
+  } finally {
+    delete prop!.enum;
+  }
+});
+
+test("a real same-display-name variant pair collapses to a single record", () => {
+  // ADBE Easy Levels and ADBE Easy Levels2 both display as "Levels".
+  const selection = selectEffectRecords("Add a Levels effect to the layer");
+  const levels = selectedDisplayNames(selection.matchNames).filter(
+    (name) => name === "Levels"
+  );
+  assert.equal(levels.length, 1);
+});
+
 test("explicit effects rank ahead of generic matches and variants are deduplicated", () => {
   const prompt = [
     "Build a GATE WEAVE layer with this treatment:",

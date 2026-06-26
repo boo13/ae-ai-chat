@@ -16,6 +16,8 @@ const tempRoot = mkdtempSync(join(tmpdir(), "ae-ai-chat-tests-"));
 const sourceFiles = [
   "src/js/lib/expression-rewriter.ts",
   "src/js/lib/knowledge/effects.ts",
+  "src/js/lib/knowledge/validator.ts",
+  "src/js/lib/knowledge/validator-utils.ts",
   "src/js/lib/knowledge/types.ts",
   "src/js/lib/knowledge/data/effect-index.ts",
   "src/js/lib/knowledge/data/effects-detail.ts",
