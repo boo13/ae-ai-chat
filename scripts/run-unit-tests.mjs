@@ -15,6 +15,7 @@ const repoRoot = resolve(import.meta.dirname, "..");
 const tempRoot = mkdtempSync(join(tmpdir(), "ae-ai-chat-tests-"));
 const sourceFiles = [
   "src/js/lib/expression-rewriter.ts",
+  "src/js/lib/security.ts",
   "src/js/lib/knowledge/effects.ts",
   "src/js/lib/knowledge/validator.ts",
   "src/js/lib/knowledge/validator-utils.ts",
