@@ -66,6 +66,50 @@ test("the marker comment alone does not disable rewriting", () => {
   assert.match(result.content, /\$\.global\.__aiSetExpr\(opacity, "wiggle\(2, 20\)", 2\)/);
 });
 
+test("leaves multi-line string-concatenation assignments untouched", () => {
+  const input = [
+    'prop.expression = "var f = 2;" +',
+    '  "f * 3;";',
+    'scale.expression = "value";',
+  ].join("\n");
+  const result = rewriteExpressionAssignments(input);
+
+  assert.equal(result.rewriteCount, 1);
+  assert.match(result.content, /^prop\.expression = "var f = 2;" \+$/m);
+  assert.match(result.content, /^\s+"f \* 3;";$/m);
+  assert.match(result.content, /\$\.global\.__aiSetExpr\(scale, "value", 3\)/);
+});
+
+test("leaves assignments with unclosed parens untouched", () => {
+  const input = 'position.expression = linear(time, 0, 1, [0, 0],';
+  const result = rewriteExpressionAssignments(input);
+
+  assert.equal(result.rewriteCount, 0);
+  assert.equal(result.content, input);
+});
+
+test("still rewrites single-line assignments containing binary operators inside strings", () => {
+  const input = 'opacity.expression = "wiggle(2, 20) + 5";';
+  const result = rewriteExpressionAssignments(input);
+
+  assert.equal(result.rewriteCount, 1);
+  assert.match(
+    result.content,
+    /\$\.global\.__aiSetExpr\(opacity, "wiggle\(2, 20\) \+ 5", 1\);/
+  );
+});
+
+test("still rewrites single-line assignments ending in a real expression with trailing math", () => {
+  const input = "rotation.expression = time * 90 + 10;";
+  const result = rewriteExpressionAssignments(input);
+
+  assert.equal(result.rewriteCount, 1);
+  assert.match(
+    result.content,
+    /\$\.global\.__aiSetExpr\(rotation, time \* 90 \+ 10, 1\);/
+  );
+});
+
 test("helper initializes independently and collects expression errors", () => {
   const context = {
     $: {

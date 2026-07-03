@@ -1255,26 +1255,28 @@ function diffRunSnapshots(before: RunSnapshot | null, after: RunSnapshot | null)
   var i;
   for (i = 0; i < before.layers.length; i++) {
     var bl = before.layers[i];
-    counts[bl.name] = (counts[bl.name] || 0) + 1;
-    beforeEffects[bl.name] = bl.effects;
+    var beforeKey = "k:" + bl.name;
+    counts[beforeKey] = (counts[beforeKey] || 0) + 1;
+    beforeEffects[beforeKey] = bl.effects;
   }
 
   var added: string[] = [];
   var effectNotes: string[] = [];
   for (i = 0; i < after.layers.length; i++) {
     var al = after.layers[i];
-    if (counts[al.name]) {
-      counts[al.name]--;
+    var afterKey = "k:" + al.name;
+    if (counts[afterKey]) {
+      counts[afterKey]--;
       if (
-        typeof beforeEffects[al.name] === "number" &&
-        beforeEffects[al.name] !== al.effects &&
+        typeof beforeEffects[afterKey] === "number" &&
+        beforeEffects[afterKey] !== al.effects &&
         effectNotes.length < 10
       ) {
         effectNotes.push(
-          "Effects on \"" + al.name + "\": " + beforeEffects[al.name] + " -> " + al.effects
+          "Effects on \"" + al.name + "\": " + beforeEffects[afterKey] + " -> " + al.effects
         );
         // Only report each layer name once even if duplicated.
-        beforeEffects[al.name] = al.effects;
+        beforeEffects[afterKey] = al.effects;
       }
     } else {
       added.push(al.name);
@@ -1283,9 +1285,10 @@ function diffRunSnapshots(before: RunSnapshot | null, after: RunSnapshot | null)
 
   var removed: string[] = [];
   for (var name in counts) {
+    if (name.indexOf("k:") !== 0) continue;
     if (counts[name] > 0) {
       for (var r = 0; r < counts[name]; r++) {
-        removed.push(name);
+        removed.push(name.slice(2));
       }
     }
   }

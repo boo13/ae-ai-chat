@@ -1,4 +1,4 @@
-import { child_process, fs, os, path } from "../cep/node";
+import { child_process, crypto, fs, os, path } from "../cep/node";
 import {
   buildProviderEnv,
   resolveWorkingDirectory,
@@ -35,6 +35,21 @@ interface ClaudeLaunchDiagnostics {
 interface LaunchEnvironmentIssue {
   message: string;
   detail: string;
+}
+
+// Node's crypto.randomUUID (available since Node 15.6, well within CEP's
+// bundled Node runtime) — not the browser global, which is absent on the
+// older Chromium embedded in some CEP hosts. Falls back to a Math.random
+// UUID v4 for the `pnpm debug` browser preview, where node.ts exports {}.
+function generateSessionId(): string {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 function shortenDetail(value: string, maxLength = 56): string {
@@ -284,7 +299,7 @@ async function sendClaudeMessage(
     };
 
     const model = normalizeClaudeModel(options.model);
-    const sessionId = options.sessionId || crypto.randomUUID();
+    const sessionId = options.sessionId || generateSessionId();
     // The static knowledge corpus only needs to be sent once per session —
     // resumed sessions already carry it in their history.
     const contextPrefix = [

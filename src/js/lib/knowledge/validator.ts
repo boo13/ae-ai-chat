@@ -1,5 +1,5 @@
 import { EFFECTS_DETAIL, type EffectDetail } from "./data/effects-detail";
-import { codeOnlyView } from "./validator-utils";
+import { codeOnlyView, tokenizeJsx } from "./validator-utils";
 
 export interface ScriptValidationOccurrence {
   line: number;
@@ -299,7 +299,6 @@ function checkEs3Syntax(codeOnly: string): ScriptValidationError[] {
   const checks: Array<{ re: RegExp; code: string; label: string }> = [
     { re: /\b(let|const)\s+/g, code: "ES3_LET_CONST", label: "let/const" },
     { re: /=>/g, code: "ES3_ARROW", label: "arrow function (=>)" },
-    { re: /`/g, code: "ES3_TEMPLATE_LITERAL", label: "template literal" },
     { re: /\.\.\./g, code: "ES3_SPREAD", label: "spread/rest operator (...)" },
   ];
 
@@ -320,6 +319,28 @@ function checkEs3Syntax(codeOnly: string): ScriptValidationError[] {
   }
 
   return errors;
+}
+
+// Backtick regions are tokenized as "string" tokens (see tokenizeJsx), so
+// codeOnlyView blanks them out and they can never reach checkEs3Syntax's
+// regex checks. Detect template literals from the tokens directly instead.
+function checkTemplateLiterals(content: string): ScriptValidationError[] {
+  const occurrences: ScriptValidationOccurrence[] = [];
+  let offset = 0;
+  for (const token of tokenizeJsx(content)) {
+    if (token.kind === "string" && token.text.startsWith("`")) {
+      occurrences.push(getLineColumn(content, offset));
+    }
+    offset += token.text.length;
+  }
+  if (occurrences.length === 0) return [];
+  return [
+    {
+      code: "ES3_TEMPLATE_LITERAL",
+      message: `ES3 violation: template literal — ${VALIDATOR_REJECTIONS.find((r) => r.code === "ES3_TEMPLATE_LITERAL")?.description ?? "template literal"}`,
+      occurrences,
+    },
+  ];
 }
 
 function checkNonAscii(content: string): ScriptValidationError[] {
@@ -401,6 +422,16 @@ function checkExpressionSyntax(content: string): ScriptValidationWarning[] {
 const STRING_LITERAL_RE = /(['"])((?:\\.|(?!\1).)*)\1/;
 const NUMBER_LITERAL_RE = /-?\d+(?:\.\d+)?/;
 
+function commentsBlankedView(content: string): string {
+  return tokenizeJsx(content)
+    .map((token) =>
+      token.kind === "line-comment" || token.kind === "block-comment"
+        ? token.text.replace(/[^\n]/g, " ")
+        : token.text
+    )
+    .join("");
+}
+
 // Catches a literal value passed to a OneD/enum effect property:
 //   - a UI-label string ("Dynamic", "Cinespace 2383sRGB6bit") — never valid
 //   - an integer outside the verified enum set — likely a guessed value
@@ -412,10 +443,10 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
   const warnings: ScriptValidationWarning[] = [];
   const seen = new Set<string>();
   const mnRe = /(['"])(ADBE [^'"]+-\d{4}|CC [^'"]+-\d{4})\1/g;
+  const scanText = commentsBlankedView(content);
 
   let lineStart = 0;
-  for (const line of content.split("\n")) {
-    const code = line.replace(/\/\/.*$/, "");
+  for (const code of scanText.split("\n")) {
     mnRe.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = mnRe.exec(code)) !== null) {
@@ -471,7 +502,7 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
         occurrences: [occurrence],
       });
     }
-    lineStart += line.length + 1;
+    lineStart += code.length + 1;
   }
 
   return warnings;
@@ -483,6 +514,7 @@ export function validateScript(content: string): ScriptValidationResult {
   const errors: ScriptValidationError[] = [
     ...checkNonAscii(content),       // Check original — non-ASCII anywhere breaks the file
     ...checkEs3Syntax(codeOnly),      // Check code-only — ignore strings/comments
+    ...checkTemplateLiterals(content), // Check original — backticks are tokenized as strings, so codeOnly can't see them
     ...checkInvalidGlobals(codeOnly),
     ...checkUndoGroupBalance(codeOnly),
   ];

@@ -38,25 +38,68 @@ export interface AvailableUpdate {
 
 interface ParsedVersion {
   numbers: number[];
-  isPrerelease: boolean;
+  prerelease: string | null;
 }
 
 function parseVersion(value: string): ParsedVersion | null {
   const normalized = value.trim().replace(/^v/i, "").split("+", 1)[0];
-  const [numberPart, prereleasePart] = normalized.split("-", 2);
+  const prereleaseStart = normalized.indexOf("-");
+  const numberPart =
+    prereleaseStart === -1 ? normalized : normalized.slice(0, prereleaseStart);
+  const prerelease =
+    prereleaseStart === -1 ? null : normalized.slice(prereleaseStart + 1);
   const numberParts = numberPart.split(".");
 
   if (
     numberParts.length === 0 ||
-    numberParts.some((part) => !/^\d+$/.test(part))
+    numberParts.some((part) => !/^\d+$/.test(part)) ||
+    prerelease === ""
   ) {
     return null;
   }
 
   return {
     numbers: numberParts.map(Number),
-    isPrerelease: prereleasePart !== undefined,
+    prerelease,
   };
+}
+
+function comparePrerelease(left: string | null, right: string | null): number {
+  if (left === right) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+
+  const leftParts = left.split(".");
+  const rightParts = right.split(".");
+  const length = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = leftParts[index];
+    const rightPart = rightParts[index];
+    if (leftPart === undefined) return -1;
+    if (rightPart === undefined) return 1;
+
+    const leftNumeric = /^\d+$/.test(leftPart);
+    const rightNumeric = /^\d+$/.test(rightPart);
+    if (leftNumeric && rightNumeric) {
+      const leftNumber = Number(leftPart);
+      const rightNumber = Number(rightPart);
+      if (leftNumber !== rightNumber) {
+        return leftNumber > rightNumber ? 1 : -1;
+      }
+      continue;
+    }
+
+    if (leftNumeric !== rightNumeric) {
+      return leftNumeric ? -1 : 1;
+    }
+
+    if (leftPart !== rightPart) {
+      return leftPart > rightPart ? 1 : -1;
+    }
+  }
+
+  return 0;
 }
 
 export function compareVersions(left: string, right: string): number {
@@ -76,8 +119,7 @@ export function compareVersions(left: string, right: string): number {
     }
   }
 
-  if (leftVersion.isPrerelease === rightVersion.isPrerelease) return 0;
-  return leftVersion.isPrerelease ? -1 : 1;
+  return comparePrerelease(leftVersion.prerelease, rightVersion.prerelease);
 }
 
 function readCachedRelease(): ReleaseInfo | null {

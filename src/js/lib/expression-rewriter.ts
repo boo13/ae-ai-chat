@@ -14,6 +14,43 @@ const EXPRESSION_HELPER_SIGNATURE = "$.global.__aiSetExpr = function";
 const EXPR_ASSIGN_RE =
   /^([ \t]*)(.*?)\.expression(?!Error|Enabled|Engine)\s*=\s*(?!=)(.+?)\s*;?\s*$/;
 
+// Detects whether a captured RHS is a syntactically complete expression, i.e.
+// the assignment does not continue onto the next physical line. The model
+// frequently emits long expressions as multi-line string concatenations
+// (template literals are ES3-banned), and rewriting only the first line of
+// those would produce a hard ES3 syntax error — see EXPR_ASSIGN_RE above.
+function isCompleteExpression(rhs: string): boolean {
+  let depth = 0;
+  let inString = false;
+  let quote = "";
+
+  for (let i = 0; i < rhs.length; i++) {
+    const ch = rhs[i];
+    if (inString) {
+      if (ch === "\\") {
+        i++;
+      } else if (ch === quote) {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = true;
+      quote = ch;
+    } else if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+    } else if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+    }
+  }
+
+  if (inString) return false;
+  if (depth !== 0) return false;
+  if (/[+\-*/%,&|^?:]$/.test(rhs)) return false;
+
+  return true;
+}
+
 function splitTrailingLineComment(line: string): {
   code: string;
   comment: string;
@@ -76,6 +113,8 @@ export function rewriteExpressionAssignments(
     const lhs = match[2].trimEnd();
     const rhs = match[3].trimEnd();
     const suffix = comment ? " " + comment : "";
+
+    if (!isCompleteExpression(rhs)) return line;
 
     rewriteCount++;
     return `${indent}$.global.__aiSetExpr(${lhs}, ${rhs}, ${lineNum});${suffix}`;
