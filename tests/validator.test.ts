@@ -70,3 +70,39 @@ test("does not flag BlendMode inside a string or comment", () => {
   );
   assert.equal(errors.length, 0);
 });
+
+test("flags a template literal", () => {
+  const script = "var label = `Layer ${i}`;";
+  const errors = validateScript(script).errors.filter(
+    (e) => e.code === "ES3_TEMPLATE_LITERAL"
+  );
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].occurrences.length, 1);
+});
+
+test("does not flag a backtick that appears inside a normal quoted string", () => {
+  const script = 'var note = "wrap code in ` marks";';
+  const errors = validateScript(script).errors.filter(
+    (e) => e.code === "ES3_TEMPLATE_LITERAL"
+  );
+  assert.equal(errors.length, 0);
+});
+
+test("does not flag enum values inside block comments", () => {
+  const script = [
+    "/*",
+    'fx.property("ADBE Fractal Noise-0001").setValue("Dynamic");',
+    "*/",
+  ].join("\n");
+
+  assert.equal(enumWarnings(script).length, 0);
+});
+
+test("still flags enum values after strings containing line-comment markers", () => {
+  const script =
+    'var url = "https://example.test"; fx.property("ADBE Fractal Noise-0001").setValue("Dynamic");';
+
+  const warnings = enumWarnings(script);
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].invalidMatchName, "ADBE Fractal Noise-0001");
+});

@@ -463,6 +463,7 @@
           // Update the streamed message with the cleaned display text and duration
           messages[streamingIdx].content = displayText;
           messages[streamingIdx].duration_ms = result.duration_ms;
+          streamingIdx = -1;
         } else {
           addMessage("assistant", displayText, {
             duration_ms: result.duration_ms,

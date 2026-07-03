@@ -14,6 +14,11 @@
     } catch {}
     onSave(trimmed);
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === "Enter") handleSave();
+  }
 </script>
 
 <div class="settings">
@@ -33,7 +38,7 @@
       type="password"
       placeholder="sk-ant-..."
       bind:value={inputKey}
-      onkeydown={(e) => e.key === "Enter" && handleSave()}
+      onkeydown={handleKeydown}
     />
     <button
       class="settings__btn"
