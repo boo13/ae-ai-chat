@@ -13,3 +13,4 @@ example-scripts
 todos
 .env
 .env.local
+offline/
