@@ -1,6 +1,8 @@
 # AE AI Chat
 
-A chat panel that lives inside Adobe After Effects. It reads your project and composition automatically — comp name, size, duration, frame rate, layer stack, selected layers, effects, and expressions — so you can ask about your *actual* project and get answers grounded in what's really there.
+![AE AI Chat banner](screenshots/repo-banner.png)
+
+An AI chat panel that lives inside Adobe After Effects. It reads your project and composition automatically — comp name, size, duration, frame rate, layer stack, selected layers, effects, and expressions — so you can ask about your *actual* project and get answers grounded in what's really there.
 
 Two ways people use it:
 
