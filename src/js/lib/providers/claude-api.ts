@@ -191,10 +191,10 @@ export const claudeApiProvider: ProviderDefinition = {
   id: "claude-api",
   displayName: "Claude API",
   models: [
-    { value: "claude-haiku-4-5", label: "Haiku" },
-    { value: "claude-sonnet-4-6", label: "Sonnet" },
-    { value: "claude-opus-4-8", label: "Opus" },
-    { value: "claude-fable-5", label: "Fable" },
+    { value: "claude-haiku-4-5", label: "Haiku 4.5" },
+    { value: "claude-sonnet-5", label: "Sonnet 5" },
+    { value: "claude-opus-4-8", label: "Opus 4.8" },
+    { value: "claude-fable-5", label: "Fable 5" },
   ],
   supportsImages: true,
   async isAvailable() {

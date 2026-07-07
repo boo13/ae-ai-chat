@@ -166,6 +166,7 @@ function getCleanEnv(): Record<string, string> {
 function normalizeClaudeModel(model: string): string {
   if (model === "opus") return "opus";
   if (model === "haiku") return "haiku";
+  if (model === "fable") return "fable";
   return "sonnet";
 }
 
@@ -677,9 +678,10 @@ export const claudeProvider: ProviderDefinition = {
   id: "claude",
   displayName: "Claude",
   models: [
-    { value: "haiku", label: "Haiku" },
-    { value: "sonnet", label: "Sonnet" },
-    { value: "opus", label: "Opus" },
+    { value: "haiku", label: "Haiku 4.5" },
+    { value: "sonnet", label: "Sonnet 5" },
+    { value: "opus", label: "Opus 4.8" },
+    { value: "fable", label: "Fable 5" },
   ],
   supportsImages: false,
   async isAvailable() {
