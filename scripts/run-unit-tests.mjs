@@ -19,11 +19,15 @@ const sourceFiles = [
   "src/js/lib/update-check.ts",
   "src/js/lib/cep/node.ts",
   "src/js/lib/knowledge/effects.ts",
+  "src/js/lib/knowledge/expressions.ts",
   "src/js/lib/knowledge/validator.ts",
   "src/js/lib/knowledge/validator-utils.ts",
   "src/js/lib/knowledge/types.ts",
   "src/js/lib/knowledge/data/effect-index.ts",
   "src/js/lib/knowledge/data/effects-detail.ts",
+  "src/js/lib/knowledge/data/expressions.ts",
+  "src/js/lib/knowledge/data/property-matchnames.ts",
+  "src/shared/run-diff.ts",
 ];
 const testFiles = readdirSync(join(repoRoot, "tests"))
   .filter((file) => file.endsWith(".test.ts"))

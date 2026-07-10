@@ -1,0 +1,7 @@
+{
+  "id": "repeater-radial-burst",
+  "description": "Build a radial burst from a shape rectangle and a Repeater with evenly distributed copies.",
+  "keywords": ["radial burst", "shape repeater", "repeater copies", "sunburst"],
+  "script": "app.beginUndoGroup(\"Repeater Radial Burst\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition.\");\nvar shape = comp.layers.addShape();\nshape.name = \"Radial Burst\";\nvar contents = shape.property(\"ADBE Root Vectors Group\");\nvar group = contents.addProperty(\"ADBE Vector Group\");\nvar groupContents = group.property(\"ADBE Vectors Group\");\nvar rect = groupContents.addProperty(\"ADBE Vector Shape - Rect\");\nrect.property(\"ADBE Vector Rect Size\").setValue([12, 180]);\nrect.property(\"ADBE Vector Rect Position\").setValue([0, -150]);\nvar fill = groupContents.addProperty(\"ADBE Vector Graphic - Fill\");\nfill.property(\"ADBE Vector Fill Color\").setValue([1, 0.3, 0.05, 1]);\nvar repeater = groupContents.addProperty(\"ADBE Vector Filter - Repeater\");\nrepeater.property(\"ADBE Vector Repeater Copies\").setValue(24);\nrepeater.property(\"ADBE Vector Repeater Transform\").property(\"ADBE Vector Repeater Rotation\").setValue(15);\nshape.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2]);\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Uses verified shape-layer matchNames and RGBA fill values."
+}

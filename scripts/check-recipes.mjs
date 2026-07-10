@@ -95,6 +95,10 @@ function validateRecipeShape(recipes) {
     );
     assert(Array.isArray(recipe.keywords) && recipe.keywords.length > 0, recipe.id + " needs keywords");
     assert(typeof recipe.script === "string" && recipe.script, recipe.id + " script must be non-empty");
+    assert(
+      recipe.verifiedStatus === "verified" || recipe.verifiedStatus === "pending",
+      recipe.id + " must have a valid runtime verification status"
+    );
   }
 }
 
@@ -108,6 +112,8 @@ function validateKnowledgeSourceOrder() {
     .map((name) => name.trim())
     .filter(Boolean);
 
+  assert(names[0] === "gotchasKnowledge", "gotchasKnowledge should be the first source");
+  assert(names[1] === "expressionsKnowledge", "expressionsKnowledge should follow gotchasKnowledge");
   assert(names[names.length - 1] === "recipesKnowledge", "recipesKnowledge should be the last source");
 }
 
@@ -118,7 +124,7 @@ function countFormattedRecipes(context) {
 const requireKnowledge = transpileKnowledgeModules();
 const { RECIPES } = requireKnowledge("./src/js/lib/knowledge/data/recipes.js");
 const { recipesKnowledge } = requireKnowledge("./src/js/lib/knowledge/recipes.js");
-const { getKnowledgeContext } = requireKnowledge("./src/js/lib/knowledge/index.js");
+const { getKnowledgeContext, getMessageKnowledgeContext } = requireKnowledge("./src/js/lib/knowledge/index.js");
 
 validateRecipeShape(RECIPES);
 validateKnowledgeSourceOrder();
@@ -142,12 +148,12 @@ const textPrompt = "Create a text layer that says Welcome at 48pt";
 const textContext = recipesKnowledge.getMessageContext(textPrompt);
 const textRecipe = RECIPES.find((r) => r.id === "text-layer-creation");
 assert(textRecipe, "text-layer-creation recipe is missing");
-assert(textContext.includes("## Verified Action Recipes"), "text prompt should inject recipes block");
+assert(textContext.includes("## Action Recipes"), "text prompt should inject recipes block");
 assert(textContext.includes(textRecipe.description), "text prompt should inject text-layer-creation");
 assert(textContext.includes("textProp.value"), "text recipe should include TextDocument .value read");
 assert(textContext.includes("textProp.setValue(textDoc)"), "text recipe should include TextDocument setValue");
 assert(
-  textContext.includes("verified, composable action recipes"),
+  textContext.includes("composable action recipes"),
   "injected block should include composable framing preamble"
 );
 
@@ -217,7 +223,7 @@ assert(textColorContext.includes("fillColor"), "text-color-keyframe recipe shoul
 
 const fullTextContext = getKnowledgeContext(textPrompt);
 const effectsIndex = fullTextContext.indexOf("## Verified Effects");
-const recipesIndex = fullTextContext.indexOf("## Verified Action Recipes");
+const recipesIndex = fullTextContext.indexOf("## Action Recipes");
 const rulesIndex = fullTextContext.indexOf("## Rules for Script Generation");
 assert(effectsIndex !== -1 && recipesIndex !== -1, "full context should include effects and recipes");
 assert(effectsIndex < recipesIndex, "recipes should appear after reference data");
@@ -233,8 +239,19 @@ assert(
   "effect-only Gaussian Blur prompt should not inject recipes"
 );
 assert(
-  !getKnowledgeContext(effectPrompt).includes("## Verified Action Recipes"),
+  !getKnowledgeContext(effectPrompt).includes("## Action Recipes"),
   "full effect-only context should not include recipes"
+);
+
+const presentExpressionContext = getMessageKnowledgeContext(
+  "Why is the selected expression broken?",
+  [],
+  ["wiggle", "loopOut"]
+).text;
+assert(
+  presentExpressionContext.includes("Property.wiggle") &&
+    presentExpressionContext.includes("Property.loopOut"),
+  "functions present in selected expressions should inject their reference records"
 );
 
 // -- char budget: multi-topic prompt gets more than the old 2-recipe cap --
@@ -271,7 +288,7 @@ assert(
   "fallback context should include the undo-group recipe description"
 );
 assert(
-  fallbackContext.includes("## Verified Action Recipes"),
+  fallbackContext.includes("## Action Recipes"),
   "fallback context should include the recipes section header"
 );
 

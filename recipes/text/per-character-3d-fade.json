@@ -1,0 +1,7 @@
+{
+  "id": "per-character-3d-fade",
+  "description": "Add a per-character 3D text animator that fades and moves characters into place.",
+  "keywords": ["per character 3d", "character fade", "text animator 3d", "text cascade"],
+  "script": "app.beginUndoGroup(\"Per Character 3D Fade\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 1 || !(comp.selectedLayers[0] instanceof TextLayer)) throw new Error(\"Select a text layer.\");\nvar layer = comp.selectedLayers[0];\nlayer.threeDPerChar = true;\nvar animator = layer.property(\"ADBE Text Properties\").property(\"ADBE Text Animators\").addProperty(\"ADBE Text Animator\");\nanimator.name = \"3D Fade\";\nvar props = animator.property(\"ADBE Text Animator Properties\");\nprops.addProperty(\"ADBE Text Opacity\").setValue(0);\nprops.addProperty(\"ADBE Text Position 3D\").setValue([0, 0, -100]);\nvar selector = animator.property(\"ADBE Text Selectors\").addProperty(\"ADBE Text Selector\");\nvar offset = selector.property(\"ADBE Text Percent Offset\");\noffset.setValueAtTime(comp.time, -100);\noffset.setValueAtTime(comp.time + 1.5, 100);\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Uses verified text animator property matchNames."
+}

@@ -1,4 +1,6 @@
 import { EFFECTS_DETAIL, type EffectDetail } from "./data/effects-detail";
+import { EXPRESSION_FUNCTION_NAMES } from "./data/expressions";
+import { PROPERTY_MATCHNAMES } from "./data/property-matchnames";
 import { codeOnlyView, tokenizeJsx } from "./validator-utils";
 
 export interface ScriptValidationOccurrence {
@@ -46,6 +48,10 @@ export const VALIDATOR_REJECTIONS: Array<{ code: string; description: string }> 
     description:
       "undefined ExtendScript global — the layer blend-mode enum is BlendingMode (e.g. BlendingMode.SCREEN), not BlendMode",
   },
+  {
+    code: "SETVALUE_ARITY",
+    description: "literal setValue() shape does not match the verified property valueType",
+  },
 ];
 
 // ExtendScript globals the model commonly misspells. The bad form is always a
@@ -69,6 +75,11 @@ const VARIABLE_ADD_REGEX =
 const FUZZY_SUGGESTION_THRESHOLD = 0.68;
 
 const validMatchNames = new Set(Object.keys(EFFECTS_DETAIL));
+const validPropertyMatchNames = new Set(Object.keys(PROPERTY_MATCHNAMES));
+const effectPropertyMatchNames = new Set(
+  Object.values(EFFECTS_DETAIL).flatMap((detail) => detail.properties.map((prop) => prop.matchName))
+);
+const expressionFunctionNames = new Set(EXPRESSION_FUNCTION_NAMES);
 
 interface EnumPropInfo {
   effectDisplayName: string;
@@ -225,6 +236,20 @@ function suggestMatchName(rawValue: string): SuggestedMatch | null {
   return best;
 }
 
+function suggestPropertyMatchName(rawValue: string): string | undefined {
+  const normalized = normalize(rawValue);
+  let bestName: string | undefined;
+  let bestScore = 0;
+  for (const matchName of validPropertyMatchNames) {
+    const score = similarityScore(normalized, normalize(matchName));
+    if (score > bestScore) {
+      bestName = matchName;
+      bestScore = score;
+    }
+  }
+  return bestScore >= 0.78 ? bestName : undefined;
+}
+
 function getLineColumn(content: string, index: number): ScriptValidationOccurrence {
   const source = content.slice(0, index);
   const lines = source.split("\n");
@@ -291,6 +316,35 @@ function checkEffectMatchNames(content: string): ScriptValidationWarning[] {
   }
 
   return Array.from(warningsByMatch.values());
+}
+
+function checkPropertyMatchNames(content: string): ScriptValidationWarning[] {
+  const warnings: ScriptValidationWarning[] = [];
+  const seen = new Set<string>();
+  const scanText = commentsBlankedView(content);
+  const re = /\.property\(\s*(['"])(ADBE [^'"]+)\1\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(scanText)) !== null) {
+    const matchName = match[2];
+    if (
+      validPropertyMatchNames.has(matchName) ||
+      effectPropertyMatchNames.has(matchName) ||
+      matchName === "ADBE Effect Parade"
+    ) continue;
+    if (seen.has(matchName)) continue;
+    seen.add(matchName);
+    const suggestion = suggestPropertyMatchName(matchName);
+    warnings.push({
+      code: "PROPERTY_MATCHNAME",
+      invalidMatchName: matchName,
+      suggestion,
+      message: suggestion
+        ? `Warning: "${matchName}" is not a verified property matchName. Did you mean "${suggestion}"?`
+        : `Warning: "${matchName}" is not a verified property matchName.`,
+      occurrences: [getLineColumn(content, match.index)],
+    });
+  }
+  return warnings;
 }
 
 function checkEs3Syntax(codeOnly: string): ScriptValidationError[] {
@@ -394,20 +448,55 @@ function checkUndoGroupBalance(codeOnly: string): ScriptValidationError[] {
   ];
 }
 
+interface ExpressionLiteral {
+  value: string;
+  index: number;
+}
+
+function decodeStringLiteral(literal: string): string {
+  const quote = literal[0];
+  const body = literal.slice(1, -1);
+  if (quote === '"') {
+    try { return JSON.parse(literal); } catch {}
+  }
+  return body.replace(/\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|([nrtbfv\\'"]))/g, (_match, hex, unicode, escaped) => {
+    if (hex) return String.fromCharCode(parseInt(hex, 16));
+    if (unicode) return String.fromCharCode(parseInt(unicode, 16));
+    const values: Record<string, string> = {
+      n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v",
+      "\\": "\\", "'": "'", '"': '"',
+    };
+    return values[escaped] ?? escaped;
+  });
+}
+
+function extractExpressionLiterals(content: string): ExpressionLiteral[] {
+  const results: ExpressionLiteral[] = [];
+  const scanText = commentsBlankedView(content);
+  const assignment = /\.expression\s*=\s*((?:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*(?:\+\s*)?)+)\s*;/g;
+  let match: RegExpExecArray | null;
+  while ((match = assignment.exec(scanText)) !== null) {
+    const sequence = match[1];
+    const stringRe = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g;
+    const strings = sequence.match(stringRe) || [];
+    const separators = sequence.replace(stringRe, "").replace(/[+\s]/g, "");
+    if (strings.length === 0 || separators) continue;
+    results.push({ value: strings.map(decodeStringLiteral).join(""), index: match.index });
+  }
+  return results;
+}
+
 function checkExpressionSyntax(content: string): ScriptValidationWarning[] {
-  // Only check string-literal expressions that can be statically inspected
-  const re = /\.expression\s*=\s*(['"])([\s\S]*?)\1/g;
   const warnings: ScriptValidationWarning[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(content)) !== null) {
-    const exprStr = m[2];
+  for (const expression of extractExpressionLiterals(content)) {
+    const exprStr = expression.value;
     if (/[^\x00-\x7f]/.test(exprStr)) continue; // skip non-ASCII (already caught)
     if (exprStr.trim().length === 0) continue;
     try {
       // eslint-disable-next-line no-new-func
       new Function(exprStr);
     } catch {
-      const occ = getLineColumn(content, m.index);
+      const occ = getLineColumn(content, expression.index);
       warnings.push({
         code: "EXPR_SYNTAX",
         invalidMatchName: "",
@@ -415,6 +504,60 @@ function checkExpressionSyntax(content: string): ScriptValidationWarning[] {
         occurrences: [occ],
       });
     }
+  }
+  return warnings;
+}
+
+const EXPRESSION_BUILTINS = new Set([
+  "if", "for", "while", "switch", "catch", "function",
+  "Math", "Array", "Object", "String", "Number", "Boolean", "Date", "RegExp",
+  "parseInt", "parseFloat", "isNaN", "isFinite", "eval",
+  "content",
+  "abs", "acos", "asin", "atan", "atan2", "ceil", "cos", "exp", "floor", "log",
+  "max", "min", "pow", "round", "sin", "sqrt", "tan",
+]);
+
+function checkUnknownExpressionFunctions(content: string): ScriptValidationWarning[] {
+  const warnings: ScriptValidationWarning[] = [];
+  for (const expression of extractExpressionLiterals(content)) {
+    const declared = new Set<string>();
+    let declaration: RegExpExecArray | null;
+    const declarationRe = /\bfunction\s+([A-Za-z_$][\w$]*)\s*\(|\bvar\s+([A-Za-z_$][\w$]*)\s*=\s*function\b/g;
+    while ((declaration = declarationRe.exec(expression.value)) !== null) {
+      declared.add(declaration[1] || declaration[2]);
+    }
+    const seen = new Set<string>();
+    const callRe = /\b([A-Za-z_$][\w$]*)\s*\(/g;
+    let call: RegExpExecArray | null;
+    while ((call = callRe.exec(expression.value)) !== null) {
+      const name = call[1];
+      if (
+        seen.has(name) || declared.has(name) || expressionFunctionNames.has(name) ||
+        EXPRESSION_BUILTINS.has(name)
+      ) continue;
+      seen.add(name);
+      warnings.push({
+        code: "EXPR_UNKNOWN_FN",
+        invalidMatchName: name,
+        message: `Expression calls unknown function "${name}()". Verify the name against the expression catalog or declare it locally.`,
+        occurrences: [getLineColumn(content, expression.index)],
+      });
+    }
+  }
+  return warnings;
+}
+
+function checkExpressionScriptingApi(content: string): ScriptValidationWarning[] {
+  const warnings: ScriptValidationWarning[] = [];
+  for (const expression of extractExpressionLiterals(content)) {
+    const match = expression.value.match(/\bapp\s*\.|\.setValue\s*\(|\.addProperty\s*\(/);
+    if (!match) continue;
+    warnings.push({
+      code: "EXPR_SCRIPTING_API",
+      invalidMatchName: match[0],
+      message: "Expression source uses the After Effects scripting API. Expressions cannot call app, setValue(), or addProperty().",
+      occurrences: [getLineColumn(content, expression.index)],
+    });
   }
   return warnings;
 }
@@ -508,6 +651,45 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
   return warnings;
 }
 
+function expectedValueArities(valueType: string): number[] | null {
+  if (valueType === "COLOR") return [4];
+  if (valueType === "TwoD" || valueType === "TwoD_SPATIAL") return [2];
+  if (valueType === "ThreeD" || valueType === "ThreeD_SPATIAL") return [3];
+  if (valueType === "TwoD_OR_ThreeD" || valueType === "TwoD_OR_ThreeD_SPATIAL") return [2, 3];
+  if (valueType === "OneD" || valueType === "LAYER_INDEX" || valueType === "MASK_INDEX") return [1];
+  return null;
+}
+
+function literalArrayArity(value: string): number | null {
+  const body = value.trim().slice(1, -1).trim();
+  if (!body) return 0;
+  if (/[\[\]{}]/.test(body)) return null;
+  return body.split(",").length;
+}
+
+function checkSetValueArity(content: string): ScriptValidationError[] {
+  const errors: ScriptValidationError[] = [];
+  const scanText = commentsBlankedView(content);
+  const re = /\.property\(\s*(['"])([^'"]+)\1\s*\)\s*\.setValue\(\s*(\[[^\]]*\]|-?\d+(?:\.\d+)?)\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(scanText)) !== null) {
+    const matchName = match[2];
+    const detail = PROPERTY_MATCHNAMES[matchName];
+    if (!detail) continue;
+    const expected = expectedValueArities(detail.valueType);
+    if (!expected) continue;
+    const literal = match[3].trim();
+    const actual = literal[0] === "[" ? literalArrayArity(literal) : 1;
+    if (actual === null || expected.includes(actual)) continue;
+    errors.push({
+      code: "SETVALUE_ARITY",
+      message: `${detail.name} (${matchName}) is ${detail.valueType}; setValue() received a literal with arity ${actual}, expected ${expected.join(" or ")}.`,
+      occurrences: [getLineColumn(content, match.index)],
+    });
+  }
+  return errors;
+}
+
 export function validateScript(content: string): ScriptValidationResult {
   const codeOnly = codeOnlyView(content);
 
@@ -517,11 +699,15 @@ export function validateScript(content: string): ScriptValidationResult {
     ...checkTemplateLiterals(content), // Check original — backticks are tokenized as strings, so codeOnly can't see them
     ...checkInvalidGlobals(codeOnly),
     ...checkUndoGroupBalance(codeOnly),
+    ...checkSetValueArity(content),
   ];
 
   const warnings: ScriptValidationWarning[] = [
     ...checkEffectMatchNames(content),
+    ...checkPropertyMatchNames(content),
     ...checkExpressionSyntax(content),
+    ...checkUnknownExpressionFunctions(content),
+    ...checkExpressionScriptingApi(content),
     ...checkEnumValues(content),
   ];
 

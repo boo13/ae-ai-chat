@@ -1,0 +1,7 @@
+{
+  "id": "typewriter-text-animator",
+  "description": "Create a typewriter reveal on the selected text layer with a Text Animator range selector.",
+  "keywords": ["typewriter", "text reveal", "typing animation", "range selector"],
+  "script": "app.beginUndoGroup(\"Typewriter Text Animator\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 1 || !(comp.selectedLayers[0] instanceof TextLayer)) throw new Error(\"Select a text layer.\");\nvar layer = comp.selectedLayers[0];\nvar animators = layer.property(\"ADBE Text Properties\").property(\"ADBE Text Animators\");\nvar animator = animators.addProperty(\"ADBE Text Animator\");\nanimator.name = \"Typewriter\";\nanimator.property(\"ADBE Text Animator Properties\").addProperty(\"ADBE Text Opacity\").setValue(0);\nvar selector = animator.property(\"ADBE Text Selectors\").addProperty(\"ADBE Text Selector\");\nvar end = selector.property(\"ADBE Text Percent End\");\nend.setValueAtTime(comp.time, 0);\nend.setValueAtTime(comp.time + 2, 100);\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Uses verified text-layer matchNames."
+}

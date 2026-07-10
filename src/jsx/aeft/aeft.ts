@@ -1,4 +1,10 @@
 import { getActiveComp, getProjectDir } from "./aeft-utils";
+import {
+  diffRunSnapshots,
+  type RunLayerSnapshot,
+  type RunSnapshot,
+} from "../../shared/run-diff";
+import { GLOBAL_ENUMS } from "../../js/lib/knowledge/data/global-enums";
 
 var lastAnalysisSummary = "";
 var lastAnalysisUpdatedAt = "";
@@ -189,7 +195,7 @@ function getEffectPropertyDetails(
   maxValueChars?: number
 ) {
   var valueChars = maxValueChars || 120;
-  var properties: { name: string; matchName: string; value: string }[] = [];
+  var properties: { name: string; matchName: string; value: string; expression?: string }[] = [];
 
   walkLeafProperties(effect, function (prop) {
     if (properties.length >= maxProperties) {
@@ -211,18 +217,31 @@ function getEffectPropertyDetails(
       return;
     }
 
-    properties.push({
+    var detail: { name: string; matchName: string; value: string; expression?: string } = {
       name: prop.name || "Unnamed Property",
       matchName: prop.matchName || "",
       value: truncateString(value, valueChars),
-    });
+    };
+    try {
+      if ((prop as any).canSetExpression && prop.expressionEnabled && prop.expression) {
+        detail.expression = truncateString(prop.expression, 1000);
+      }
+    } catch (e) {}
+    properties.push(detail);
   });
 
   return properties;
 }
 
 function getLayerKeyframedDetails(layer: Layer, maxProperties: number) {
-  var keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[] = [];
+  var keyframed: {
+    name: string;
+    numKeys: number;
+    firstKeyTime: number;
+    lastKeyTime: number;
+    interpolation: string;
+    eased: boolean;
+  }[] = [];
 
   for (var i = 1; i <= layer.numProperties; i++) {
     var group = null;
@@ -250,6 +269,8 @@ function getLayerKeyframedDetails(layer: Layer, maxProperties: number) {
 
       var firstKeyTime = 0;
       var lastKeyTime = 0;
+      var interpolation = "linear";
+      var eased = false;
       try {
         firstKeyTime = prop.keyTime(1);
         lastKeyTime = prop.keyTime(numKeys);
@@ -257,11 +278,33 @@ function getLayerKeyframedDetails(layer: Layer, maxProperties: number) {
         return;
       }
 
+      for (var keyIndex = 1; keyIndex <= numKeys; keyIndex++) {
+        try {
+          var inType = prop.keyInInterpolationType(keyIndex);
+          var outType = prop.keyOutInterpolationType(keyIndex);
+          if (
+            inType === KeyframeInterpolationType.HOLD ||
+            outType === KeyframeInterpolationType.HOLD
+          ) {
+            interpolation = "hold";
+          } else if (
+            interpolation !== "hold" &&
+            (inType === KeyframeInterpolationType.BEZIER ||
+              outType === KeyframeInterpolationType.BEZIER)
+          ) {
+            interpolation = "bezier";
+            eased = true;
+          }
+        } catch (e) {}
+      }
+
       keyframed.push({
         name: prop.name || "Unnamed Property",
         numKeys: numKeys,
         firstKeyTime: firstKeyTime,
         lastKeyTime: lastKeyTime,
+        interpolation: interpolation,
+        eased: eased,
       });
     });
 
@@ -330,6 +373,7 @@ function getLayerExpressionDetails(
 function buildAnalysisSummary(comp: CompItem): string {
   var lines: string[] = [];
   var maxLayers = Math.min(comp.numLayers, 50);
+  var expressionInventory: string[] = [];
 
   lines.push("## Cached Analysis");
   lines.push(
@@ -383,9 +427,30 @@ function buildAnalysisSummary(comp: CompItem): string {
     var expressions = getExpressionNames(layer);
     if (expressions.length > 0) {
       parts.push("expressions=" + expressions.join(", "));
+      var layerExpressionCount = 0;
+      walkLeafProperties(layer, function (prop) {
+        if (layerExpressionCount >= 30) return false;
+        try {
+          if (!(prop as any).canSetExpression || !prop.expressionEnabled || !prop.expression) return;
+          expressionInventory.push(
+            layer.index + ". " + layer.name + " > " + prop.name +
+            (prop.expressionError ? " | ERROR: " + truncateString(prop.expressionError, 240) : "") +
+            " | " + truncateString(prop.expression.replace(/[\r\n]+/g, " "), 300)
+          );
+          layerExpressionCount++;
+        } catch (e) {}
+      });
     }
 
     lines.push("- " + parts.join(" | "));
+  }
+
+  if (expressionInventory.length > 0) {
+    lines.push("");
+    lines.push("### Expression Inventory");
+    for (var inventoryIndex = 0; inventoryIndex < expressionInventory.length; inventoryIndex++) {
+      lines.push("- " + expressionInventory[inventoryIndex]);
+    }
   }
 
   return lines.join("\n");
@@ -568,8 +633,119 @@ interface LayerDetail {
     effectMatchName: string;
     properties: { name: string; matchName: string; value: string }[];
   }[];
-  keyframed: { name: string; numKeys: number; firstKeyTime: number; lastKeyTime: number }[];
+  keyframed: {
+    name: string;
+    numKeys: number;
+    firstKeyTime: number;
+    lastKeyTime: number;
+    interpolation: string;
+    eased: boolean;
+  }[];
   expressions: { name: string; expression: string }[];
+  transform?: string;
+  text?: string;
+  masks?: string;
+  source?: string;
+}
+
+function getTransformSummary(layer: Layer): string {
+  var transform = null;
+  try { transform = layer.property("ADBE Transform Group"); } catch (e) {}
+  if (!transform) return "";
+  var parts: string[] = [];
+  for (var i = 0; i < 5; i++) {
+    var matchNames = ["ADBE Anchor Point", "ADBE Position", "ADBE Scale", "ADBE Rotate Z", "ADBE Opacity"];
+    var labels = ["anchor", "position", "scale", "rotation", "opacity"];
+    try {
+      var prop = transform.property(matchNames[i]);
+      if (prop && prop instanceof Property) parts.push(labels[i] + "=" + stringifyValue(prop.value));
+    } catch (e) {}
+  }
+  try {
+    if (!transform.property("ADBE Position")) {
+      var split: string[] = [];
+      var splitNames = ["ADBE Position_0", "ADBE Position_1", "ADBE Position_2"];
+      for (var splitIndex = 0; splitIndex < splitNames.length; splitIndex++) {
+        var splitProp = transform.property(splitNames[splitIndex]);
+        if (splitProp && splitProp instanceof Property) split.push(stringifyValue(splitProp.value));
+      }
+      if (split.length) parts.push("position=[" + split.join(",") + "]");
+    }
+  } catch (e) {}
+  return parts.join(", ");
+}
+
+function getJustificationLabel(value: any): string {
+  var discovered = getDiscoveredEnumLabel("ParagraphJustification", value);
+  if (discovered) return discovered.replace(/_/g, "-");
+  try {
+    if (value === ParagraphJustification.LEFT_JUSTIFY) return "left";
+    if (value === ParagraphJustification.RIGHT_JUSTIFY) return "right";
+    if (value === ParagraphJustification.CENTER_JUSTIFY) return "center";
+    if (value === ParagraphJustification.FULL_JUSTIFY_LASTLINE_LEFT) return "justify-left";
+  } catch (e) {}
+  return String(value);
+}
+
+function getTextSummary(layer: Layer): string {
+  if (!(layer instanceof TextLayer)) return "";
+  try {
+    var sourceText = layer.property("ADBE Text Properties").property("ADBE Text Document");
+    if (!sourceText || !(sourceText instanceof Property)) return "";
+    var doc = sourceText.value as TextDocument;
+    var parts = [
+      "font=" + String(doc.font || ""),
+      "size=" + String(doc.fontSize),
+      "justify=" + getJustificationLabel(doc.justification),
+    ];
+    try {
+      if (doc.applyFill) parts.push("fill=" + stringifyValue(doc.fillColor));
+    } catch (e) {}
+    parts.push('text="' + truncateString(String(doc.text || "").replace(/[\r\n]+/g, " "), 60) + '"');
+    return parts.join(", ");
+  } catch (e) {}
+  return "";
+}
+
+function getMaskModeLabel(value: any): string {
+  var discovered = getDiscoveredEnumLabel("MaskMode", value);
+  if (discovered) return discovered.replace(/_/g, "-");
+  try {
+    if (value === MaskMode.ADD) return "add";
+    if (value === MaskMode.SUBTRACT) return "subtract";
+    if (value === MaskMode.INTERSECT) return "intersect";
+    if (value === MaskMode.NONE) return "none";
+  } catch (e) {}
+  return String(value);
+}
+
+function getMasksSummary(layer: Layer): string {
+  try {
+    var masks = layer.property("ADBE Mask Parade");
+    if (!masks || masks.numProperties < 1) return "";
+    var parts: string[] = [];
+    var count = Math.min(masks.numProperties, 5);
+    for (var i = 1; i <= count; i++) {
+      var mask = masks.property(i) as MaskPropertyGroup;
+      parts.push(mask.name + " (" + getMaskModeLabel(mask.maskMode) + ")");
+    }
+    if (masks.numProperties > count) parts.push("+" + (masks.numProperties - count) + " more");
+    return parts.join(", ");
+  } catch (e) {}
+  return "";
+}
+
+function getSourceSummary(layer: Layer): string {
+  if (!(layer instanceof AVLayer)) return "";
+  try {
+    if (!layer.source) return "";
+    var source = layer.source;
+    var parts = [source.name];
+    try { if ((source as AVItem).width) parts.push((source as AVItem).width + "x" + (source as AVItem).height); } catch (e) {}
+    try { if ((source as AVItem).duration) parts.push((source as AVItem).duration.toFixed(2) + "s"); } catch (e) {}
+    return parts.join(" | ");
+  } catch (e) {}
+  return "";
 }
 
 function buildLayerDetail(layer: Layer, limits: LayerDetailLimits): LayerDetail {
@@ -604,7 +780,7 @@ function buildLayerDetail(layer: Layer, limits: LayerDetailLimits): LayerDetail 
     }
   } catch (e) {}
 
-  return {
+  var detail: LayerDetail = {
     name: layer.name,
     index: layer.index,
     type: getSafeLayerType(layer),
@@ -612,6 +788,15 @@ function buildLayerDetail(layer: Layer, limits: LayerDetailLimits): LayerDetail 
     keyframed: getLayerKeyframedDetails(layer, limits.maxKeyframed),
     expressions: getLayerExpressionDetails(layer, limits.maxExpressions, limits.maxExprChars),
   };
+  var transform = getTransformSummary(layer);
+  var text = getTextSummary(layer);
+  var masks = getMasksSummary(layer);
+  var source = getSourceSummary(layer);
+  if (transform) detail.transform = transform;
+  if (text) detail.text = text;
+  if (masks) detail.masks = masks;
+  if (source) detail.source = source;
+  return detail;
 }
 
 function buildSelectedLayerDetailsData(
@@ -797,6 +982,48 @@ interface LayerStackRow {
   threeD?: boolean;
   parent?: string;
   numEffects?: number;
+  blend?: string;
+  matte?: string;
+  adjustment?: boolean;
+}
+
+function getBlendingModeLabel(value: any): string {
+  var discovered = getDiscoveredEnumLabel("BlendingMode", value);
+  if (discovered) return discovered;
+  try {
+    if (value === BlendingMode.NORMAL) return "normal";
+    if (value === BlendingMode.ADD) return "add";
+    if (value === BlendingMode.MULTIPLY) return "multiply";
+    if (value === BlendingMode.SCREEN) return "screen";
+    if (value === BlendingMode.OVERLAY) return "overlay";
+    if (value === BlendingMode.DIFFERENCE) return "difference";
+  } catch (e) {}
+  return String(value);
+}
+
+function getTrackMatteLabel(value: any): string {
+  var discovered = getDiscoveredEnumLabel("TrackMatteType", value);
+  if (discovered === "no track matte") return "";
+  if (discovered) return discovered.replace(/_/g, "-");
+  try {
+    if (value === TrackMatteType.NO_TRACK_MATTE) return "";
+    if (value === TrackMatteType.ALPHA) return "alpha";
+    if (value === TrackMatteType.ALPHA_INVERTED) return "alpha-inverted";
+    if (value === TrackMatteType.LUMA) return "luma";
+    if (value === TrackMatteType.LUMA_INVERTED) return "luma-inverted";
+  } catch (e) {}
+  return String(value);
+}
+
+function getDiscoveredEnumLabel(groupName: string, value: any): string {
+  var group = GLOBAL_ENUMS[groupName];
+  if (!group) return "";
+  for (var label in group) {
+    if (String(group[label]) === String(value) || Number(group[label]) === Number(value)) {
+      return label.toLowerCase().replace(/_/g, " ");
+    }
+  }
+  return "";
 }
 
 function buildLayerStackRow(layer: Layer): LayerStackRow {
@@ -822,6 +1049,17 @@ function buildLayerStackRow(layer: Layer): LayerStackRow {
   if (parentName) row.parent = parentName;
   var numEffects = countLayerEffects(layer);
   if (numEffects > 0) row.numEffects = numEffects;
+  try {
+    var blend = getBlendingModeLabel((layer as AVLayer).blendingMode);
+    if (blend && blend !== "normal") row.blend = blend;
+  } catch (e) {}
+  try {
+    var matte = getTrackMatteLabel((layer as AVLayer).trackMatteType);
+    if (matte) row.matte = matte;
+  } catch (e) {}
+  try {
+    if ((layer as AVLayer).adjustmentLayer) row.adjustment = true;
+  } catch (e) {}
   return row;
 }
 
@@ -1206,102 +1444,113 @@ export const getPinnedContextDetails = (pins: PinInput[]) => {
   return result;
 };
 
-interface RunSnapshot {
-  comp: string;
-  numLayers: number;
-  layers: { name: string; effects: number }[];
+function fnv1a(value: string): string {
+  var hash = 2166136261;
+  for (var i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function getTransformSnapshot(layer: Layer): { [name: string]: string } {
+  var values: { [name: string]: string } = {};
+  var group = null;
+  try { group = layer.property("ADBE Transform Group"); } catch (e) {}
+  if (!group) return values;
+  var matchNames = ["ADBE Anchor Point", "ADBE Position", "ADBE Scale", "ADBE Rotate Z", "ADBE Opacity"];
+  var names = ["anchor", "position", "scale", "rotation", "opacity"];
+  for (var i = 0; i < matchNames.length; i++) {
+    try {
+      var prop = group.property(matchNames[i]);
+      if (prop && prop instanceof Property) values[names[i]] = stringifyValue(prop.value);
+    } catch (e) {}
+  }
+  if (typeof values.position === "undefined") {
+    var split: string[] = [];
+    var splitNames = ["ADBE Position_0", "ADBE Position_1", "ADBE Position_2"];
+    for (var splitIndex = 0; splitIndex < splitNames.length; splitIndex++) {
+      try {
+        var splitProp = group.property(splitNames[splitIndex]);
+        if (splitProp && splitProp instanceof Property) split.push(stringifyValue(splitProp.value));
+      } catch (e) {}
+    }
+    if (split.length) values.position = "[" + split.join(",") + "]";
+  }
+  return values;
+}
+
+function getEffectDigest(layer: Layer): string {
+  var parts: string[] = [];
+  try {
+    var effects = layer.property("ADBE Effect Parade");
+    if (!effects) return fnv1a("");
+    for (var i = 1; i <= effects.numProperties; i++) {
+      var effect = effects.property(i);
+      if (!effect) continue;
+      parts.push(effect.matchName || effect.name || "");
+      walkLeafProperties(effect, function (prop) {
+        try {
+          parts.push((prop.matchName || prop.name || "") + "=" + truncateString(stringifyValue(prop.value), 240));
+        } catch (e) {}
+      });
+    }
+  } catch (e) {}
+  return fnv1a(parts.join("|"));
+}
+
+function getAnimationDigest(layer: Layer) {
+  var expressionParts: string[] = [];
+  var expressionCount = 0;
+  var keyframes = 0;
+  walkLeafProperties(layer, function (prop) {
+    try { keyframes += prop.numKeys || 0; } catch (e) {}
+    try {
+      if ((prop as any).canSetExpression && prop.expressionEnabled && prop.expression) {
+        expressionCount++;
+        expressionParts.push((prop.matchName || prop.name || "") + "=" + prop.expression);
+      }
+    } catch (e) {}
+  });
+  return {
+    expressionDigest: fnv1a(expressionParts.join("|")),
+    expressionCount: expressionCount,
+    keyframes: keyframes,
+  };
 }
 
 function buildRunSnapshot(): RunSnapshot | null {
   var comp = getActiveComp();
   if (!comp) return null;
-  var layers: { name: string; effects: number }[] = [];
-  var count = Math.min(comp.numLayers, 100);
-  for (var i = 1; i <= count; i++) {
+  var deep = comp.numLayers <= 60;
+  var layers: RunLayerSnapshot[] = [];
+  for (var i = 1; i <= comp.numLayers; i++) {
     var layer = comp.layer(i);
-    layers.push({ name: layer.name, effects: countLayerEffects(layer) });
-  }
-  return { comp: comp.name, numLayers: comp.numLayers, layers: layers };
-}
-
-function joinNames(names: string[], maxNames: number): string {
-  var shown = names.length > maxNames ? names.slice(0, maxNames) : names;
-  var joined = shown.join(", ");
-  if (names.length > maxNames) {
-    joined += ", and " + (names.length - maxNames) + " more";
-  }
-  return joined;
-}
-
-function diffRunSnapshots(before: RunSnapshot | null, after: RunSnapshot | null): string[] {
-  var notes: string[] = [];
-  if (!before && !after) return notes;
-  if (!before && after) {
-    notes.push("Active comp after run: " + after.comp);
-    return notes;
-  }
-  if (before && !after) {
-    notes.push("No active comp after the run.");
-    return notes;
-  }
-  if (!before || !after) return notes;
-  if (before.comp !== after.comp) {
-    notes.push("Active comp changed: \"" + before.comp + "\" -> \"" + after.comp + "\"");
-    return notes;
-  }
-
-  var counts: { [name: string]: number } = {};
-  var beforeEffects: { [name: string]: number } = {};
-  var i;
-  for (i = 0; i < before.layers.length; i++) {
-    var bl = before.layers[i];
-    var beforeKey = "k:" + bl.name;
-    counts[beforeKey] = (counts[beforeKey] || 0) + 1;
-    beforeEffects[beforeKey] = bl.effects;
-  }
-
-  var added: string[] = [];
-  var effectNotes: string[] = [];
-  for (i = 0; i < after.layers.length; i++) {
-    var al = after.layers[i];
-    var afterKey = "k:" + al.name;
-    if (counts[afterKey]) {
-      counts[afterKey]--;
-      if (
-        typeof beforeEffects[afterKey] === "number" &&
-        beforeEffects[afterKey] !== al.effects &&
-        effectNotes.length < 10
-      ) {
-        effectNotes.push(
-          "Effects on \"" + al.name + "\": " + beforeEffects[afterKey] + " -> " + al.effects
-        );
-        // Only report each layer name once even if duplicated.
-        beforeEffects[afterKey] = al.effects;
-      }
-    } else {
-      added.push(al.name);
+    var item: RunLayerSnapshot = {
+      name: layer.name,
+      effects: countLayerEffects(layer),
+    };
+    if (deep) {
+      var animation = getAnimationDigest(layer);
+      item.effectDigest = getEffectDigest(layer);
+      item.transform = getTransformSnapshot(layer);
+      item.expressionDigest = animation.expressionDigest;
+      item.expressionCount = animation.expressionCount;
+      item.keyframes = animation.keyframes;
+      try { item.inPoint = layer.inPoint; } catch (e) {}
+      try { item.outPoint = layer.outPoint; } catch (e) {}
     }
+    layers.push(item);
   }
-
-  var removed: string[] = [];
-  for (var name in counts) {
-    if (name.indexOf("k:") !== 0) continue;
-    if (counts[name] > 0) {
-      for (var r = 0; r < counts[name]; r++) {
-        removed.push(name.slice(2));
-      }
-    }
-  }
-
-  if (added.length > 0) notes.push("Layers added: " + joinNames(added, 10));
-  if (removed.length > 0) notes.push("Layers removed: " + joinNames(removed, 10));
-  if (before.numLayers !== after.numLayers) {
-    notes.push("Layer count: " + before.numLayers + " -> " + after.numLayers);
-  }
-  for (i = 0; i < effectNotes.length; i++) {
-    notes.push(effectNotes[i]);
-  }
-  return notes;
+  return {
+    comp: comp.name,
+    numLayers: comp.numLayers,
+    duration: comp.duration,
+    workAreaStart: comp.workAreaStart,
+    workAreaDuration: comp.workAreaDuration,
+    deep: deep,
+    layers: layers,
+  };
 }
 
 export const runAnalysisScript = () => {
@@ -1356,17 +1605,26 @@ export const runScriptFile = (filePath: string) => {
   try {
     app.beginUndoGroup("AI Chat: Run Script");
     //@ts-ignore
+    $.global.__aiExprErrors = [];
+    //@ts-ignore
+    $.global.__aiExprSet = [];
+    //@ts-ignore
     var result = $.evalFile(scriptFile);
     app.endUndoGroup();
     //@ts-ignore
     var exprErrors = $.global.__aiExprErrors || [];
     //@ts-ignore
+    var expressionsSet = $.global.__aiExprSet || [];
+    //@ts-ignore
     $.global.__aiExprErrors = [];
+    //@ts-ignore
+    $.global.__aiExprSet = [];
     return {
       success: exprErrors.length === 0,
       message: exprErrors.length === 0 ? "Script executed successfully." : "Script ran but expression errors occurred.",
       result: String(result),
       expressionErrors: exprErrors,
+      expressionsSet: expressionsSet,
       stateDiff: captureStateDiff(),
     };
   } catch (e: any) {
@@ -1374,12 +1632,17 @@ export const runScriptFile = (filePath: string) => {
     //@ts-ignore
     var catchExprErrors = $.global.__aiExprErrors || [];
     //@ts-ignore
+    var catchExpressionsSet = $.global.__aiExprSet || [];
+    //@ts-ignore
     $.global.__aiExprErrors = [];
+    //@ts-ignore
+    $.global.__aiExprSet = [];
     return {
       error: "Script failed: " + e.toString(),
       errorLine: e.line || null,
       errorName: e.name || null,
       expressionErrors: catchExprErrors,
+      expressionsSet: catchExpressionsSet,
       stateDiff: captureStateDiff(),
     };
   }

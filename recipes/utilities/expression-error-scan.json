@@ -1,0 +1,7 @@
+{
+  "id": "expression-error-scan",
+  "description": "Scan every expression-enabled property in the active comp and report expressionError messages with layer and property names.",
+  "keywords": ["expression error scan", "find broken expressions", "expressionerror", "troubleshoot expressions"],
+  "script": "app.beginUndoGroup(\"Expression Error Scan\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition.\");\nvar errors = [];\nfunction walk(group, layerName) {\n  for (var i = 1; i <= group.numProperties; i++) {\n    var item = group.property(i);\n    if (!item) continue;\n    if (item instanceof Property) {\n      if (item.canSetExpression && item.expressionEnabled) {\n        try { item.valueAtTime(comp.time, false); } catch (e) {}\n        if (item.expressionError) errors.push(layerName + \" > \" + item.name + \": \" + item.expressionError);\n      }\n    } else {\n      walk(item, layerName);\n    }\n  }\n}\nfor (var layerIndex = 1; layerIndex <= comp.numLayers; layerIndex++) walk(comp.layer(layerIndex), comp.layer(layerIndex).name);\nif (errors.length) alert(errors.join(\"\\n\\n\"));\nelse alert(\"No expression errors found.\");\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Forces valueAtTime() before reading expressionError."
+}

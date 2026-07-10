@@ -90,9 +90,24 @@
   let lastActionResult: LastActionResult | null = null;
 
   function recordActionSuccess(runResult: unknown, summary: string): string[] {
-    const rawDiff = (runResult as any)?.stateDiff;
+    const result = runResult && typeof runResult === "object"
+      ? runResult as Record<string, unknown>
+      : {};
+    const rawDiff = result.stateDiff;
     const stateDiff: string[] = Array.isArray(rawDiff) ? rawDiff.map(String) : [];
-    lastActionResult = { summary, ranAt: Date.now(), stateDiff };
+    const rawExpressionsSet = result.expressionsSet;
+    const expressionsSet = Array.isArray(rawExpressionsSet)
+      ? rawExpressionsSet.map((entry) => {
+          const record = entry && typeof entry === "object"
+            ? entry as Record<string, unknown>
+            : {};
+          return {
+            name: String(record.name || "Expression"),
+            layer: record.layer ? String(record.layer) : undefined,
+          };
+        })
+      : [];
+    lastActionResult = { summary, ranAt: Date.now(), stateDiff, expressionsSet };
     return stateDiff;
   }
 

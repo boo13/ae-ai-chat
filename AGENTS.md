@@ -67,7 +67,7 @@ How AE state reaches the model on every message (`src/js/lib/context.ts`):
 - **Pinned chips resolve to data.** `getPinnedContextDetails()` turns pinned comp/layer/effect chips into actual layer stacks and effect property values (with name/matchName fallback when indices shift). Bare labels are only sent if resolution fails.
 - **Static vs. dynamic context.** `buildContext()` returns `staticContext` (byte-stable knowledge corpus: effect index, gotchas, property trees, rules, constraints, action protocol) and `systemContext` (per-turn AE state + message-matched recipes/effect records). The Claude API provider sends the static part as the first system block with a `cache_control` breakpoint (prompt cache); the CLI providers send it only on a session's first turn. **Never put per-turn data in the static part** — any byte change invalidates the cache.
 - **Present-effect records.** Verified effect records are injected not just for effects named in the user message, but for effects already present on selected/pinned layers (`getMessageKnowledgeContext` in `src/js/lib/knowledge/index.ts`).
-- **Post-run verification.** `runScriptFile()` diffs the active comp before/after execution; the panel shows the diff and feeds it into the next message's context as `## Last AI Action` so the model can verify the action actually changed something.
+- **Post-run verification.** `runScriptFile()` diffs a bounded `RunSnapshot` before/after execution: transforms, effect-parameter digests, expressions, keyframe counts, layer timing, and comp duration/work area for comps up to 60 layers, with a shallow fallback above that. Successful expression assignments are reported separately. The panel feeds this evidence into the next message as `## Last AI Action`; an empty diff is explicitly inconclusive.
 
 ## ExtendScript (ES3) Constraints
 
@@ -128,7 +128,11 @@ Trust provenance tags in the upstream effect JSON: `[VERIFIED]` and `[DOCS]` are
 
 ### Action recipes
 
-Recipes are **verified, composable action building blocks** — not reference-then-forget examples. The model is instructed to combine and adapt them to satisfy requests, treating them as authoritative primitives. Do not use the word "examples" to describe them.
+Recipes are **composable action building blocks** — not reference-then-forget examples. Generated entries carry a runtime verification status; verified recipes are authoritative primitives, while pending recipes must be promoted after their AE checkpoint. Do not use the word "examples" to describe them.
+
+### Expression language
+
+Expression methods and pitfalls come from `../ae-ai-starter/Scripts/verified/expressions/`. Records retain docsforadobe commit provenance and a `verifiedStatus`; do not describe a docs-sourced record as AE-verified until a `verify_expressions.jsx` sidecar promotes it. `scripts/generate-knowledge.mjs` emits the bounded static index and full message-matched detail catalog in `src/js/lib/knowledge/data/expressions.ts`.
 
 Recipes are authored as individual JSON files with schema `{id, description, keywords[], script, notes?}`. The `script` field must be ES3-compliant ExtendScript wrapped in `app.beginUndoGroup / endUndoGroup`.
 

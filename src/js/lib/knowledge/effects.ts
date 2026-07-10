@@ -46,6 +46,9 @@ function formatEffect(detail: EffectDetail): string {
       ? `[${prop.defaultValue.join(", ")}]`
       : String(prop.defaultValue);
     let line = `  ${prop.index}. ${prop.name} | ${prop.matchName} | ${prop.valueType} | default: ${def}`;
+    if (typeof prop.minValue === "number" || typeof prop.maxValue === "number") {
+      line += ` | range: ${typeof prop.minValue === "number" ? prop.minValue : "?"}..${typeof prop.maxValue === "number" ? prop.maxValue : "?"}`;
+    }
     if (prop.enum) {
       const options = Object.keys(prop.enum)
         .map((label) => `${label}=${prop.enum![label]}`)

@@ -6,6 +6,7 @@ import {
   getStaticKnowledgeContext,
 } from "./knowledge/index";
 import { wrapUntrustedContext } from "./security";
+import { EXPRESSION_FUNCTION_NAMES } from "./knowledge/data/expressions";
 
 interface ProjectInfo {
   projectName: string;
@@ -27,6 +28,9 @@ interface LayerStackRow {
   threeD?: boolean;
   parent?: string;
   numEffects?: number;
+  blend?: string;
+  matte?: string;
+  adjustment?: boolean;
 }
 
 interface CompMarker {
@@ -54,6 +58,7 @@ interface SelectedLayerEffectProperty {
   name: string;
   matchName: string;
   value: string;
+  expression?: string;
 }
 
 interface SelectedLayerEffect {
@@ -67,6 +72,8 @@ interface SelectedLayerKeyframedProperty {
   numKeys: number;
   firstKeyTime: number;
   lastKeyTime: number;
+  interpolation: string;
+  eased: boolean;
 }
 
 interface SelectedLayerExpression {
@@ -81,6 +88,10 @@ interface LayerDetail {
   effects: SelectedLayerEffect[];
   keyframed: SelectedLayerKeyframedProperty[];
   expressions: SelectedLayerExpression[];
+  transform?: string;
+  text?: string;
+  masks?: string;
+  source?: string;
 }
 
 interface SelectedLayerDetails {
@@ -156,6 +167,7 @@ export interface LastActionResult {
   summary: string;
   ranAt: number;
   stateDiff: string[];
+  expressionsSet: Array<{ name: string; layer?: string }>;
 }
 
 export interface ChatContext {
@@ -308,6 +320,9 @@ function formatLayerStackRow(row: LayerStackRow): string {
     parts.push(`${formatSeconds(row.inPoint)}-${formatSeconds(row.outPoint)}`);
   }
   if (row.parent) parts.push(`parent=${row.parent}`);
+  if (row.blend) parts.push(`blend=${row.blend}`);
+  if (row.matte) parts.push(`matte=${row.matte}`);
+  if (row.adjustment) parts.push("adj");
   if (row.threeD) parts.push("3D");
   if (row.disabled) parts.push("disabled");
   if (row.locked) parts.push("locked");
@@ -318,12 +333,18 @@ function formatLayerStackRow(row: LayerStackRow): string {
 function buildLayerDetailLines(layer: LayerDetail, indent: string): string[] {
   const lines: string[] = [];
 
+  if (layer.transform) lines.push(`${indent}Transform: ${layer.transform}`);
+  if (layer.text) lines.push(`${indent}Text: ${layer.text}`);
+  if (layer.masks) lines.push(`${indent}Masks: ${layer.masks}`);
+  if (layer.source) lines.push(`${indent}Source: ${layer.source}`);
+
   if (layer.effects.length > 0) {
     lines.push(`${indent}Effects:`);
     for (const effect of layer.effects) {
       lines.push(`${indent}  ${effect.effectName} (${effect.effectMatchName})`);
       for (const prop of effect.properties) {
         lines.push(`${indent}    ${prop.name} | ${prop.value}`);
+        if (prop.expression) lines.push(`${indent}      Expression: ${formatExpressionInline(prop.expression)}`);
       }
     }
   }
@@ -332,7 +353,7 @@ function buildLayerDetailLines(layer: LayerDetail, indent: string): string[] {
     const keyframedSummary = layer.keyframed
       .map(
         (prop) =>
-          `${prop.name} (${prop.numKeys} keys, ${formatSeconds(prop.firstKeyTime)}-${formatSeconds(prop.lastKeyTime)})`
+          `${prop.name} (${prop.numKeys} keys, ${formatSeconds(prop.firstKeyTime)}-${formatSeconds(prop.lastKeyTime)}, ${prop.interpolation}${prop.eased ? ", eased" : ""})`
       )
       .join(", ");
     lines.push(`${indent}Keyframed: ${keyframedSummary}`);
@@ -399,6 +420,7 @@ function buildPinnedDetailLines(detail: PinnedDetail): string[] {
   );
   for (const prop of detail.properties || []) {
     lines.push(`    ${prop.name} | ${prop.matchName} | ${prop.value}`);
+    if (prop.expression) lines.push(`      Expression: ${formatExpressionInline(prop.expression)}`);
   }
   return lines;
 }
@@ -432,7 +454,8 @@ function buildSelectedLayerDetailsSection(details: SelectedLayerDetails | null):
     (layer) =>
       layer.effects.length > 0 ||
       layer.keyframed.length > 0 ||
-      layer.expressions.length > 0
+      layer.expressions.length > 0 ||
+      Boolean(layer.transform || layer.text || layer.masks || layer.source)
   );
   if (usefulLayers.length === 0) return [];
 
@@ -508,6 +531,38 @@ function collectPresentEffectMatchNames(
   }
 
   return matchNames;
+}
+
+function collectPresentExpressionFunctions(
+  selectedLayerDetails: SelectedLayerDetails | null,
+  selectedPropertyDetails: SelectedPropertyDetails | null,
+  resolvedPins: PinnedDetail[]
+): string[] {
+  const texts: string[] = [];
+  for (const layer of selectedLayerDetails?.layers || []) {
+    for (const expression of layer.expressions) texts.push(expression.expression);
+  }
+  for (const property of selectedPropertyDetails?.properties || []) {
+    if (property.expression) texts.push(property.expression);
+  }
+  for (const detail of resolvedPins) {
+    if (detail.pinType === "effect") {
+      for (const property of detail.properties || []) {
+        if (property.expression) texts.push(property.expression);
+      }
+    }
+    if (detail.pinType === "layer" && detail.layer) {
+      for (const expression of detail.layer.expressions) texts.push(expression.expression);
+    }
+  }
+
+  const found: string[] = [];
+  const combined = texts.join("\n");
+  for (const name of EXPRESSION_FUNCTION_NAMES) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp("\\b" + escaped + "\\s*\\(").test(combined)) found.push(name);
+  }
+  return found;
 }
 
 const STATIC_PRELUDE = [
@@ -682,15 +737,21 @@ export async function buildContext(
     aeLines.push("");
     aeLines.push("## Last AI Action");
     aeLines.push(`Ran at ${new Date(lastAction.ranAt).toISOString()}: ${lastAction.summary}`);
+    if (lastAction.expressionsSet.length > 0) {
+      aeLines.push(
+        "Expressions set successfully: " +
+          lastAction.expressionsSet
+            .map((entry) => `${entry.name}${entry.layer ? ` on '${entry.layer}'` : ""}`)
+            .join(", ")
+      );
+    }
     if (lastAction.stateDiff.length > 0) {
       aeLines.push("Observed changes in the active comp:");
       for (const note of lastAction.stateDiff) {
         aeLines.push(`  - ${note}`);
       }
     } else {
-      aeLines.push(
-        "No layer/effect changes were observed in the active comp — if the action was supposed to change something, verify it actually did."
-      );
+      aeLines.push("No tracked comp changes were detected. Script completion alone does not prove an untracked property changed.");
     }
   }
 
@@ -702,7 +763,16 @@ export async function buildContext(
   );
 
   const presentEffects = collectPresentEffectMatchNames(selectedLayerDetails, resolvedPins);
-  const knowledgeContext = getMessageKnowledgeContext(userMessage, presentEffects);
+  const presentExpressionFunctions = collectPresentExpressionFunctions(
+    selectedLayerDetails,
+    selectedPropertyDetails,
+    resolvedPins
+  );
+  const knowledgeContext = getMessageKnowledgeContext(
+    userMessage,
+    presentEffects,
+    presentExpressionFunctions
+  );
   if (knowledgeContext.text) {
     lines.push("");
     lines.push(knowledgeContext.text);

@@ -115,6 +115,7 @@ test("helper initializes independently and collects expression errors", () => {
     $: {
       global: {
         __aiExprErrors: [] as Array<Record<string, unknown>>,
+        __aiExprSet: [] as Array<Record<string, unknown>>,
       },
     },
   };
@@ -155,5 +156,31 @@ test("helper initializes independently and collects expression errors", () => {
       { line: 4, error: "property is null/undefined" },
       { line: 8, error: "undefined identifier" },
     ]
+  );
+
+  helper(
+    {
+      name: "Position",
+      canSetExpression: true,
+      expressionError: "",
+      propertyDepth: 2,
+      propertyGroup() {
+        return { name: "Title" };
+      },
+      valueAtTime() {
+        return [0, 0];
+      },
+    },
+    "wiggle(2, 20)",
+    12
+  );
+  assert.deepEqual(
+    context.$.global.__aiExprSet.map((entry) => ({
+      line: entry.line,
+      name: entry.name,
+      layer: entry.layer,
+      expr: entry.expr,
+    })),
+    [{ line: 12, name: "Position", layer: "Title", expr: "wiggle(2, 20)" }]
   );
 });

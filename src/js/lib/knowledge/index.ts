@@ -5,6 +5,11 @@ import {
 } from "./effects";
 import { recipesKnowledge } from "./recipes";
 import { gotchasKnowledge } from "./gotchas";
+import {
+  expressionsKnowledge,
+  formatExpressionRecords,
+  matchExpressionFunctionNames,
+} from "./expressions";
 import { layersKnowledge } from "./layers";
 import { shapesKnowledge } from "./shapes";
 import { textKnowledge } from "./text";
@@ -13,6 +18,7 @@ import { VALIDATOR_REJECTIONS } from "./validator";
 
 const sources: KnowledgeSource[] = [
   gotchasKnowledge,
+  expressionsKnowledge,
   effectsKnowledge,
   shapesKnowledge,
   textKnowledge,
@@ -37,10 +43,8 @@ const RULES = `## Rules for Script Generation
 - Wrap all changes in app.beginUndoGroup() / app.endUndoGroup().
 
 ## Expressions
-- Expressions run in a separate engine from scripts. Set them as string values: prop.expression = "wiggle(2, 50)".
-- If app.project.expressionEngine is "extendscript", expressions must be ES3. Otherwise (default "javascript-1.0") ES6 is fine.
-- The panel captures prop.expressionError after setting expressions — a broken expression triggers auto-fix. Write expressions carefully.
-- Access thisComp, thisLayer, thisProperty inside expressions. Do NOT call AE scripting functions inside expressions.
+- Use the Expression Language Reference catalog and injected detailed records for signatures, compatibility, verification status, and pitfalls.
+- The panel captures prop.expressionError after setting expressions; do not claim success when an expression reports an error.
 
 ## Validator — what will be blocked
 The panel static-checks generated scripts before running. The following patterns are errors that block execution:
@@ -56,6 +60,7 @@ export interface KnowledgeContextResult {
 }
 
 const MAX_PRESENT_EFFECT_RECORDS = 8;
+const MAX_PRESENT_EXPRESSION_RECORDS = 8;
 
 let cachedStaticContext: string | null = null;
 
@@ -81,7 +86,8 @@ export function getStaticKnowledgeContext(): string {
 // user doesn't name the effect).
 export function getMessageKnowledgeContext(
   userMessage?: string,
-  presentEffectMatchNames?: string[]
+  presentEffectMatchNames?: string[],
+  presentExpressionFunctions?: string[]
 ): KnowledgeContextResult {
   const sections: string[] = [];
   const recipeIds = new Set<string>();
@@ -121,6 +127,29 @@ export function getMessageKnowledgeContext(
       sections.push(
         [
           "## Verified Effect Records (effects present on selected/pinned layers)",
+          ...blocks,
+        ].join("\n\n")
+      );
+    }
+  }
+
+  if (presentExpressionFunctions && presentExpressionFunctions.length > 0) {
+    const alreadyMatched = userMessage
+      ? matchExpressionFunctionNames(userMessage)
+      : new Set<string>();
+    const seen = new Set<string>();
+    const remaining: string[] = [];
+    for (const name of presentExpressionFunctions) {
+      if (!name || seen.has(name) || alreadyMatched.has(name)) continue;
+      seen.add(name);
+      remaining.push(name);
+      if (remaining.length >= MAX_PRESENT_EXPRESSION_RECORDS) break;
+    }
+    const blocks = formatExpressionRecords(remaining);
+    if (blocks.length > 0) {
+      sections.push(
+        [
+          "## Expression Reference Records (functions present in selected/pinned expressions)",
           ...blocks,
         ].join("\n\n")
       );

@@ -1,0 +1,7 @@
+{
+  "id": "wiggle-with-slider-controls",
+  "description": "Add Frequency and Amount slider controls and drive the selected layer Position with a wiggle expression.",
+  "keywords": ["wiggle controls", "wiggle slider", "frequency slider", "amount slider"],
+  "script": "app.beginUndoGroup(\"Wiggle With Controls\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 1) throw new Error(\"Select a layer.\");\nvar layer = comp.selectedLayers[0];\nvar effects = layer.property(\"ADBE Effect Parade\");\nvar frequency = effects.addProperty(\"ADBE Slider Control\");\nfrequency.name = \"Wiggle Frequency\";\nfrequency.property(1).setValue(2);\nvar amount = effects.addProperty(\"ADBE Slider Control\");\namount.name = \"Wiggle Amount\";\namount.property(1).setValue(50);\nvar position = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\nposition.expression = \"var f = effect('Wiggle Frequency')('Slider');\\nvar a = effect('Wiggle Amount')('Slider');\\nwiggle(f, a);\";\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Uses the verified wiggle() signature and Slider Control matchName."
+}

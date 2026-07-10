@@ -127,6 +127,9 @@ export const EXPRESSION_HELPER_PREAMBLE = `${EXPRESSION_HELPER_MARKER}
 if (!$.global.__aiExprErrors) {
   $.global.__aiExprErrors = [];
 }
+if (!$.global.__aiExprSet) {
+  $.global.__aiExprSet = [];
+}
 $.global.__aiSetExpr = function (prop, expr, lineNum) {
   if (!prop) {
     $.global.__aiExprErrors.push({ line: lineNum, error: "property is null/undefined" });
@@ -145,7 +148,19 @@ $.global.__aiSetExpr = function (prop, expr, lineNum) {
       name: String(prop.name || ""),
       expr: String(expr).substring(0, 200)
     });
+    return;
   }
+  var ownerName = "";
+  try {
+    var owner = prop.propertyGroup(prop.propertyDepth);
+    ownerName = String(owner && owner.name || "");
+  } catch (e) {}
+  $.global.__aiExprSet.push({
+    line: lineNum,
+    name: String(prop.name || ""),
+    layer: ownerName,
+    expr: String(expr).substring(0, 200)
+  });
 };`;
 
 export function prepareExpressionCapture(

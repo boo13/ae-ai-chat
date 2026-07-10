@@ -1,0 +1,7 @@
+{
+  "id": "bounce-overshoot-expression",
+  "description": "Add a damped bounce overshoot expression after the last keyframe on selected numeric properties.",
+  "keywords": ["bounce expression", "overshoot expression", "damped bounce", "keyframe bounce"],
+  "script": "app.beginUndoGroup(\"Bounce Overshoot\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedProperties.length < 1) throw new Error(\"Select a keyframed property.\");\nfor (var i = 0; i < comp.selectedProperties.length; i++) {\n  var prop = comp.selectedProperties[i];\n  if (prop instanceof Property && prop.canSetExpression) {\n    prop.expression = \"var amp = 0.08;\\nvar freq = 3;\\nvar decay = 5;\\nif (numKeys < 1 || time <= key(numKeys).time) value;\\nelse {\\n  var t = time - key(numKeys).time;\\n  var v = velocityAtTime(key(numKeys).time - thisComp.frameDuration / 10);\\n  value + v * amp * Math.sin(freq * t * 2 * Math.PI) / Math.exp(decay * t);\\n}\";\n  }\n}\napp.endUndoGroup();",
+  "notes": "AE runtime verification pending. Uses verified key(), velocityAtTime(), and thisComp.frameDuration references."
+}

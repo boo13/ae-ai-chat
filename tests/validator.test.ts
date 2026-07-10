@@ -106,3 +106,70 @@ test("still flags enum values after strings containing line-comment markers", ()
   assert.equal(warnings.length, 1);
   assert.equal(warnings[0].invalidMatchName, "ADBE Fractal Noise-0001");
 });
+
+test("blocks a literal color with the wrong setValue arity", () => {
+  const script = 'fx.property("ADBE Glo2-0012").setValue([1, 0, 0]);';
+  const errors = validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY");
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /expected 4/);
+});
+
+test("does not block a correctly shaped color or a variable value", () => {
+  const script = [
+    'fx.property("ADBE Glo2-0012").setValue([1, 0, 0, 1]);',
+    'fx.property("ADBE Glo2-0012").setValue(colorValue);',
+  ].join("\n");
+  assert.equal(validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY").length, 0);
+});
+
+test("suggests a verified non-effect property matchName typo", () => {
+  const warnings = validateScript('layer.property("ADBE Transform Groupp");').warnings.filter(
+    (warning) => warning.code === "PROPERTY_MATCHNAME"
+  );
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].suggestion, "ADBE Transform Group");
+});
+
+test("does not flag a verified non-effect property matchName", () => {
+  const warnings = validateScript('layer.property("ADBE Transform Group");').warnings.filter(
+    (warning) => warning.code === "PROPERTY_MATCHNAME"
+  );
+  assert.equal(warnings.length, 0);
+});
+
+test("folds concatenated expression strings before syntax checking", () => {
+  const script = 'prop.expression = "var x = (" + "1 + 2;";';
+  const warnings = validateScript(script).warnings.filter((warning) => warning.code === "EXPR_SYNTAX");
+  assert.equal(warnings.length, 1);
+});
+
+test("accepts a valid concatenated expression string", () => {
+  const script = 'prop.expression = "var x = 1;" + "x + 2;";';
+  const warnings = validateScript(script).warnings.filter((warning) => warning.code === "EXPR_SYNTAX");
+  assert.equal(warnings.length, 0);
+});
+
+test("warns about unknown expression functions but not catalog or local functions", () => {
+  const unknown = validateScript('prop.expression = "wggle(2, 20);";').warnings.filter(
+    (warning) => warning.code === "EXPR_UNKNOWN_FN"
+  );
+  assert.equal(unknown.length, 1);
+  assert.equal(unknown[0].invalidMatchName, "wggle");
+
+  const valid = validateScript(
+    'prop.expression = "function twice(x) { return x * 2; } twice(wiggle(2, 20));";'
+  ).warnings.filter((warning) => warning.code === "EXPR_UNKNOWN_FN");
+  assert.equal(valid.length, 0);
+});
+
+test("warns when expression source uses scripting APIs only", () => {
+  const inside = validateScript('prop.expression = "app.project.item(1).setValue(2);";').warnings.filter(
+    (warning) => warning.code === "EXPR_SCRIPTING_API"
+  );
+  assert.equal(inside.length, 1);
+
+  const outside = validateScript('prop.setValue(2);').warnings.filter(
+    (warning) => warning.code === "EXPR_SCRIPTING_API"
+  );
+  assert.equal(outside.length, 0);
+});

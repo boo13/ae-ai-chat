@@ -10,7 +10,7 @@ const TERM_STOP_WORDS = new Set([
   "between", "per", "via", "new", "one", "two", "add", "set", "get", "use",
   "do", "make",
   // AE-generic terms that appear in almost every recipe and don't discriminate
-  "layer", "layers",
+  "layer", "layers", "effect", "effects", "selected",
 ]);
 
 function termTokenize(text: string): string[] {
@@ -42,13 +42,13 @@ for (const recipe of RECIPES) {
 }
 
 const PREAMBLE =
-  "These are verified, composable action recipes for After Effects. " +
-  "Treat them as building blocks: combine and adapt them to fulfill the user's request " +
-  "rather than starting from scratch.";
+  "These are composable action recipes for After Effects. Each entry states its runtime verification status. " +
+  "Treat verified recipes as authoritative building blocks; adapt pending recipes carefully until their AE checkpoint is complete.";
 
 function formatRecipe(recipe: RecipeEntry): string {
   const lines = [
     "### " + recipe.description,
+    "Runtime verification: " + recipe.verifiedStatus,
     "```jsx",
     recipe.script,
     "```",
@@ -109,7 +109,7 @@ export const recipesKnowledge: KnowledgeSource = {
 
     if (matched.length === 0) return "";
 
-    return ["## Verified Action Recipes", PREAMBLE, ...matched.map(formatRecipe)].join("\n\n");
+    return ["## Action Recipes", PREAMBLE, ...matched.map(formatRecipe)].join("\n\n");
   },
   getMessageContextDiagnostics(userMessage: string) {
     return {
