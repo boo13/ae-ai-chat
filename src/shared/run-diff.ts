@@ -6,6 +6,7 @@ export interface RunLayerSnapshot {
   expressionDigest?: string;
   expressionCount?: number;
   keyframes?: number;
+  keyframeDigest?: string;
   inPoint?: number;
   outPoint?: number;
   trackMatte?: string;
@@ -106,6 +107,12 @@ export function diffRunSnapshots(
       matched.keyframes !== afterLayer.keyframes
     ) {
       push(notes, 'Keyframes changed on "' + afterLayer.name + '" (' + matched.keyframes + " -> " + afterLayer.keyframes + ')');
+    } else if (
+      matched.keyframeDigest &&
+      afterLayer.keyframeDigest &&
+      matched.keyframeDigest !== afterLayer.keyframeDigest
+    ) {
+      push(notes, 'Keyframe easing changed on "' + afterLayer.name + '"');
     }
     if (
       typeof matched.expressionCount === "number" &&

@@ -166,6 +166,20 @@ async function main() {
   try {
     await connect();
     for (const recipe of recipes) {
+      // alert() blocks AE on a modal dialog, which would hang the CDP driver.
+      // These interactive/diagnostic recipes are reported for manual verification.
+      if (/\balert\s*\(/.test(recipe.script)) {
+        results.push({
+          id: recipe.id,
+          source: relative(root, recipe.path),
+          pending: recipe.pending,
+          status: "SKIP",
+          kind: "interactive",
+          reason: "Recipe calls alert(); verify manually to avoid blocking the driver.",
+        });
+        continue;
+      }
+
       const tempPath = join(tempDir, recipe.id + ".jsx");
       writeFileSync(tempPath, wrapUndoGroup(recipe.script) + "\n");
 
