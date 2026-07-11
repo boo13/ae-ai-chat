@@ -1,7 +1,12 @@
 {
   "id": "glow-treatment-stack",
   "description": "Add a verified Glow effect treatment to selected layers with practical threshold, radius, and intensity values.",
-  "keywords": ["glow treatment", "glow stack", "neon glow", "add glow"],
+  "keywords": [
+    "glow treatment",
+    "glow stack",
+    "neon glow",
+    "add glow"
+  ],
   "script": "app.beginUndoGroup(\"Glow Treatment\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 1) throw new Error(\"Select at least one layer.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  var effects = comp.selectedLayers[i].property(\"ADBE Effect Parade\");\n  var glow = effects.addProperty(\"ADBE Glo2\");\n  glow.property(\"ADBE Glo2-0002\").setValue(55);\n  glow.property(\"ADBE Glo2-0003\").setValue(35);\n  glow.property(\"ADBE Glo2-0004\").setValue(1.2);\n}\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. Uses the verified Glow effect and property matchNames."
+  "notes": "Uses the verified Glow effect and property matchNames."
 }

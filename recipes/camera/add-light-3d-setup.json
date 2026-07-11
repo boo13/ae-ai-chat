@@ -1,7 +1,12 @@
 {
   "id": "add-light-3d-setup",
   "description": "Create a 3D point light and enable 3D plus light acceptance on selected AV layers.",
-  "keywords": ["add light", "3d light", "point light", "light setup"],
+  "keywords": [
+    "add light",
+    "3d light",
+    "point light",
+    "light setup"
+  ],
   "script": "app.beginUndoGroup(\"3D Light Setup\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  try { comp.selectedLayers[i].threeDLayer = true; } catch (e) {}\n}\nvar light = comp.layers.addLight(\"Key Light\", [comp.width * 0.35, comp.height * 0.3]);\nlight.lightType = LightType.POINT;\nlight.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width * 0.35, comp.height * 0.3, -500]);\nlight.property(\"ADBE Light Options Group\").property(\"ADBE Light Intensity\").setValue(100);\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. LightType values are discovered by discover_global_enums.jsx."
+  "notes": "LightType values are discovered by discover_global_enums.jsx."
 }

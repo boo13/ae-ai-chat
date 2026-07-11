@@ -1,7 +1,12 @@
 {
   "id": "track-matte-setup",
   "description": "Use the first selected layer as an alpha track matte for the second selected layer with the AE 23 setTrackMatte API.",
-  "keywords": ["track matte", "alpha matte", "settrackmatte", "matte setup"],
+  "keywords": [
+    "track matte",
+    "alpha matte",
+    "settrackmatte",
+    "matte setup"
+  ],
   "script": "app.beginUndoGroup(\"Track Matte Setup\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 2) throw new Error(\"Select matte then fill layers.\");\nvar matte = comp.selectedLayers[0];\nvar fill = comp.selectedLayers[1];\nif (typeof fill.setTrackMatte !== \"function\") throw new Error(\"setTrackMatte requires After Effects 23 or newer.\");\nfill.setTrackMatte(matte, TrackMatteType.ALPHA);\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. Requires AE 23+. TrackMatteType values are discovered by discover_global_enums.jsx."
+  "notes": "Requires AE 23+. TrackMatteType values are discovered by discover_global_enums.jsx."
 }

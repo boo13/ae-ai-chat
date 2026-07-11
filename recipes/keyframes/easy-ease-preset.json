@@ -8,5 +8,5 @@
     "bezier keyframes"
   ],
   "script": "app.beginUndoGroup(\"Easy Ease Preset\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedProperties.length < 1) throw new Error(\"Select keyframed properties.\");\nfor (var i = 0; i < comp.selectedProperties.length; i++) {\n  var prop = comp.selectedProperties[i];\n  if (!(prop instanceof Property) || prop.numKeys < 1) continue;\n  var isSpatial = prop.propertyValueType === PropertyValueType.TwoD_SPATIAL || prop.propertyValueType === PropertyValueType.ThreeD_SPATIAL;\n  var dimensions = isSpatial ? 1 : (prop.value instanceof Array ? prop.value.length : 1);\n  var easeIn = [];\n  var easeOut = [];\n  for (var d = 0; d < dimensions; d++) {\n    easeIn.push(new KeyframeEase(0, 33.333));\n    easeOut.push(new KeyframeEase(0, 33.333));\n  }\n  for (var k = 1; k <= prop.numKeys; k++) {\n    prop.setInterpolationTypeAtKey(k, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);\n    prop.setTemporalEaseAtKey(k, easeIn, easeOut);\n  }\n}\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. KeyframeInterpolationType values are discovered by discover_global_enums.jsx."
+  "notes": "KeyframeInterpolationType values are discovered by discover_global_enums.jsx."
 }

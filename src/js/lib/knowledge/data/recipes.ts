@@ -33,8 +33,8 @@ export const RECIPES: RecipeEntry[] = [
       "numeric",
       "properties"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses verified key(), velocityAtTime(), and thisComp.frameDuration references."
+    "verifiedStatus": "verified",
+    "notes": "Uses verified key(), velocityAtTime(), and thisComp.frameDuration references."
   },
   {
     "id": "expression-follow-delay",
@@ -59,8 +59,8 @@ export const RECIPES: RecipeEntry[] = [
       "delayed",
       "trailing"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses the verified valueAtTime() method."
+    "verifiedStatus": "verified",
+    "notes": "Uses the verified valueAtTime() method."
   },
   {
     "id": "expression-on-property",
@@ -114,8 +114,8 @@ export const RECIPES: RecipeEntry[] = [
       "animation",
       "repeat"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. The numKeys guard covers the verified loopOut() two-key requirement."
+    "verifiedStatus": "verified",
+    "notes": "The numKeys guard covers the verified loopOut() two-key requirement."
   },
   {
     "id": "time-remap-enable",
@@ -166,8 +166,8 @@ export const RECIPES: RecipeEntry[] = [
       "wiggle",
       "expression"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses the verified wiggle() signature and Slider Control matchName."
+    "verifiedStatus": "verified",
+    "notes": "Uses the verified wiggle() signature and Slider Control matchName."
   },
   {
     "id": "add-light-3d-setup",
@@ -188,8 +188,8 @@ export const RECIPES: RecipeEntry[] = [
       "acceptance",
       "setup"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. LightType values are discovered by discover_global_enums.jsx."
+    "verifiedStatus": "verified",
+    "notes": "LightType values are discovered by discover_global_enums.jsx."
   },
   {
     "id": "camera-orbit-null-rig",
@@ -211,8 +211,8 @@ export const RECIPES: RecipeEntry[] = [
       "orbit",
       "rig"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses full Transform property paths."
+    "verifiedStatus": "verified",
+    "notes": "Uses full Transform property paths."
   },
   {
     "id": "duplicate-composition",
@@ -315,8 +315,8 @@ export const RECIPES: RecipeEntry[] = [
       "stack",
       "neon"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses the verified Glow effect and property matchNames."
+    "verifiedStatus": "verified",
+    "notes": "Uses the verified Glow effect and property matchNames."
   },
   {
     "id": "copy-keyframes",
@@ -353,7 +353,7 @@ export const RECIPES: RecipeEntry[] = [
       "temporal ease",
       "bezier keyframes"
     ],
-    "script": "app.beginUndoGroup(\"Easy Ease Preset\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem) || comp.selectedProperties.length < 1) throw new Error(\"Select keyframed properties.\");\n  for (var i = 0; i < comp.selectedProperties.length; i++) {\n    var prop = comp.selectedProperties[i];\n    if (!(prop instanceof Property) || prop.numKeys < 1) continue;\n    var dimensions = prop.value instanceof Array ? prop.value.length : 1;\n    var easeIn = [];\n    var easeOut = [];\n    for (var d = 0; d < dimensions; d++) {\n      easeIn.push(new KeyframeEase(0, 33.333));\n      easeOut.push(new KeyframeEase(0, 33.333));\n    }\n    for (var k = 1; k <= prop.numKeys; k++) {\n      prop.setInterpolationTypeAtKey(k, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);\n      prop.setTemporalEaseAtKey(k, easeIn, easeOut);\n    }\n  }\n} finally {\n  app.endUndoGroup();\n}",
+    "script": "app.beginUndoGroup(\"Easy Ease Preset\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem) || comp.selectedProperties.length < 1) throw new Error(\"Select keyframed properties.\");\n  for (var i = 0; i < comp.selectedProperties.length; i++) {\n    var prop = comp.selectedProperties[i];\n    if (!(prop instanceof Property) || prop.numKeys < 1) continue;\n    var isSpatial = prop.propertyValueType === PropertyValueType.TwoD_SPATIAL || prop.propertyValueType === PropertyValueType.ThreeD_SPATIAL;\n    var dimensions = isSpatial ? 1 : (prop.value instanceof Array ? prop.value.length : 1);\n    var easeIn = [];\n    var easeOut = [];\n    for (var d = 0; d < dimensions; d++) {\n      easeIn.push(new KeyframeEase(0, 33.333));\n      easeOut.push(new KeyframeEase(0, 33.333));\n    }\n    for (var k = 1; k <= prop.numKeys; k++) {\n      prop.setInterpolationTypeAtKey(k, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);\n      prop.setTemporalEaseAtKey(k, easeIn, easeOut);\n    }\n  }\n} finally {\n  app.endUndoGroup();\n}",
     "terms": [
       "apply",
       "temporal",
@@ -369,8 +369,8 @@ export const RECIPES: RecipeEntry[] = [
       "keyframe",
       "keyframes"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. KeyframeInterpolationType values are discovered by discover_global_enums.jsx."
+    "verifiedStatus": "verified",
+    "notes": "KeyframeInterpolationType values are discovered by discover_global_enums.jsx."
   },
   {
     "id": "keyframe-temporal-ease",
@@ -558,8 +558,8 @@ export const RECIPES: RecipeEntry[] = [
       "api",
       "setup"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Requires AE 23+. TrackMatteType values are discovered by discover_global_enums.jsx."
+    "verifiedStatus": "verified",
+    "notes": "Requires AE 23+. TrackMatteType values are discovered by discover_global_enums.jsx."
   },
   {
     "id": "import-file",
@@ -672,8 +672,8 @@ export const RECIPES: RecipeEntry[] = [
       "copies",
       "sunburst"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses verified shape-layer matchNames and RGBA fill values."
+    "verifiedStatus": "verified",
+    "notes": "Uses verified shape-layer matchNames and RGBA fill values."
   },
   {
     "id": "shape-rect-stroke-fill",
@@ -750,8 +750,8 @@ export const RECIPES: RecipeEntry[] = [
       "fade",
       "cascade"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses verified text animator property matchNames."
+    "verifiedStatus": "verified",
+    "notes": "Uses verified text animator property matchNames."
   },
   {
     "id": "text-box-sourcerect",
@@ -762,7 +762,7 @@ export const RECIPES: RecipeEntry[] = [
       "responsive box",
       "text background"
     ],
-    "script": "app.beginUndoGroup(\"Responsive Text Box\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem) || comp.selectedLayers.length < 1 || !(comp.selectedLayers[0] instanceof TextLayer)) throw new Error(\"Select a text layer.\");\n  var textLayer = comp.selectedLayers[0];\n  var box = comp.layers.addShape();\n  box.name = textLayer.name + \" Box\";\n  var contents = box.property(\"ADBE Root Vectors Group\");\n  var group = contents.addProperty(\"ADBE Vector Group\");\n  var groupContents = group.property(\"ADBE Vectors Group\");\n  var rect = groupContents.addProperty(\"ADBE Vector Shape - Rect\");\n  var fill = groupContents.addProperty(\"ADBE Vector Graphic - Fill\");\n  fill.property(\"ADBE Vector Fill Color\").setValue([0.1, 0.1, 0.1, 1]);\n  function quoteLayerName(value) {\n    var result = \"\";\n    for (var i = 0; i < value.length; i++) {\n      var ch = value.charAt(i);\n      if (ch === \"\\\\\" || ch === \"'\") result += \"\\\\\";\n      result += ch;\n    }\n    return result;\n  }\n  var escaped = quoteLayerName(textLayer.name);\n  rect.property(\"ADBE Vector Rect Size\").expression = \"var r = thisComp.layer('\" + escaped + \"').sourceRectAtTime(time, false);\\n[r.width + 40, r.height + 30];\";\n  rect.property(\"ADBE Vector Rect Position\").expression = \"var r = thisComp.layer('\" + escaped + \"').sourceRectAtTime(time, false);\\n[r.left + r.width / 2, r.top + r.height / 2];\";\n  box.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue(textLayer.property(\"ADBE Transform Group\").property(\"ADBE Position\").value);\n  box.moveAfter(textLayer);\n} finally {\n  app.endUndoGroup();\n}",
+    "script": "app.beginUndoGroup(\"Responsive Text Box\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem) || comp.selectedLayers.length < 1 || !(comp.selectedLayers[0] instanceof TextLayer)) throw new Error(\"Select a text layer.\");\n  var textLayer = comp.selectedLayers[0];\n  var box = comp.layers.addShape();\n  box.name = textLayer.name + \" Box\";\n  var contents = box.property(\"ADBE Root Vectors Group\");\n  var group = contents.addProperty(\"ADBE Vector Group\");\n  var groupContents = group.property(\"ADBE Vectors Group\");\n  groupContents.addProperty(\"ADBE Vector Shape - Rect\");\n  groupContents.addProperty(\"ADBE Vector Graphic - Fill\");\n  var rect = groupContents.property(\"ADBE Vector Shape - Rect\");\n  var fill = groupContents.property(\"ADBE Vector Graphic - Fill\");\n  fill.property(\"ADBE Vector Fill Color\").setValue([0.1, 0.1, 0.1, 1]);\n  function quoteLayerName(value) {\n    var result = \"\";\n    for (var i = 0; i < value.length; i++) {\n      var ch = value.charAt(i);\n      if (ch === \"\\\\\" || ch === \"'\") result += \"\\\\\";\n      result += ch;\n    }\n    return result;\n  }\n  var escaped = quoteLayerName(textLayer.name);\n  rect.property(\"ADBE Vector Rect Size\").expression = \"var r = thisComp.layer('\" + escaped + \"').sourceRectAtTime(time, false);\\n[r.width + 40, r.height + 30];\";\n  rect.property(\"ADBE Vector Rect Position\").expression = \"var r = thisComp.layer('\" + escaped + \"').sourceRectAtTime(time, false);\\n[r.left + r.width / 2, r.top + r.height / 2];\";\n  box.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue(textLayer.property(\"ADBE Transform Group\").property(\"ADBE Position\").value);\n  box.moveAfter(textLayer);\n} finally {\n  app.endUndoGroup();\n}",
     "terms": [
       "create",
       "shape",
@@ -776,8 +776,8 @@ export const RECIPES: RecipeEntry[] = [
       "responsive",
       "background"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Calls sourceRectAtTime() once per expression evaluation."
+    "verifiedStatus": "verified",
+    "notes": "Calls sourceRectAtTime() once per expression evaluation."
   },
   {
     "id": "text-color-keyframe",
@@ -862,8 +862,8 @@ export const RECIPES: RecipeEntry[] = [
       "typing",
       "animation"
     ],
-    "verifiedStatus": "pending",
-    "notes": "AE runtime verification pending. Uses verified text-layer matchNames."
+    "verifiedStatus": "verified",
+    "notes": "Uses verified text-layer matchNames."
   },
   {
     "id": "add-layer-marker",

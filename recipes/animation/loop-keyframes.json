@@ -1,7 +1,12 @@
 {
   "id": "loop-keyframes",
   "description": "Loop the selected keyframed properties with a cycle loopOut expression and guard properties with fewer than two keys.",
-  "keywords": ["loop keyframes", "loopout", "cycle animation", "repeat keyframes"],
+  "keywords": [
+    "loop keyframes",
+    "loopout",
+    "cycle animation",
+    "repeat keyframes"
+  ],
   "script": "app.beginUndoGroup(\"Loop Keyframes\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedProperties.length < 1) throw new Error(\"Select at least one property.\");\nfor (var i = 0; i < comp.selectedProperties.length; i++) {\n  var prop = comp.selectedProperties[i];\n  if (prop instanceof Property && prop.canSetExpression) {\n    prop.expression = \"numKeys >= 2 ? loopOut('cycle') : value;\";\n  }\n}\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. The numKeys guard covers the verified loopOut() two-key requirement."
+  "notes": "The numKeys guard covers the verified loopOut() two-key requirement."
 }

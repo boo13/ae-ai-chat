@@ -1,7 +1,12 @@
 {
   "id": "camera-orbit-null-rig",
   "description": "Create a two-node camera parented to a centered 3D null for an orbit rig.",
-  "keywords": ["camera orbit", "camera rig", "orbit null", "two node camera"],
+  "keywords": [
+    "camera orbit",
+    "camera rig",
+    "orbit null",
+    "two node camera"
+  ],
   "script": "app.beginUndoGroup(\"Camera Orbit Rig\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition.\");\nvar rig = comp.layers.addNull(comp.duration);\nrig.name = \"Camera Orbit\";\nrig.threeDLayer = true;\nrig.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2, 0]);\nvar camera = comp.layers.addCamera(\"Orbit Camera\", [comp.width / 2, comp.height / 2]);\ncamera.property(\"ADBE Transform Group\").property(\"ADBE Position\").setValue([comp.width / 2, comp.height / 2, -1500]);\ncamera.setParentWithJump(rig);\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. Uses full Transform property paths."
+  "notes": "Uses full Transform property paths."
 }

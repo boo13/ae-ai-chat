@@ -1,7 +1,13 @@
 {
   "id": "expression-follow-delay",
   "description": "Make the second selected layer follow the first selected layer Position with a configurable time delay expression.",
-  "keywords": ["follow delay", "delayed follow", "position delay", "trailing layer", "time delay"],
+  "keywords": [
+    "follow delay",
+    "delayed follow",
+    "position delay",
+    "trailing layer",
+    "time delay"
+  ],
   "script": "app.beginUndoGroup(\"Follow With Delay\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem) || comp.selectedLayers.length < 2) throw new Error(\"Select leader then follower layers.\");\nvar leader = comp.selectedLayers[0];\nvar follower = comp.selectedLayers[1];\nvar delay = follower.property(\"ADBE Effect Parade\").addProperty(\"ADBE Slider Control\");\ndelay.name = \"Follow Delay\";\ndelay.property(1).setValue(0.15);\nfunction quoteLayerName(value) {\n  var result = \"\";\n  for (var i = 0; i < value.length; i++) {\n    var ch = value.charAt(i);\n    if (ch === \"\\\\\" || ch === \"'\") result += \"\\\\\";\n    result += ch;\n  }\n  return result;\n}\nvar escaped = quoteLayerName(leader.name);\nvar position = follower.property(\"ADBE Transform Group\").property(\"ADBE Position\");\nposition.expression = \"var d = effect('Follow Delay')('Slider');\\nthisComp.layer('\" + escaped + \"').transform.position.valueAtTime(time - d);\";\napp.endUndoGroup();",
-  "notes": "AE runtime verification pending. Uses the verified valueAtTime() method."
+  "notes": "Uses the verified valueAtTime() method."
 }
