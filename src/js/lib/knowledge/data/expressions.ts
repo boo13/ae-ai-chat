@@ -22,10 +22,10 @@ export interface ExpressionDetail {
   source: string;
   verifiedAEVersion: string | null;
   verifiedEngines: string[];
-  verifiedStatus: string;
+  verifiedStatus: "verified" | "pending";
 }
 
-export const EXPRESSION_INDEX = "global.hexToRgb(hexString) -> Array (4-dimensional) [docs-sourced]\nglobal.hslToRgb(hslaArray) -> RGBA Array (4-dimensional) [docs-sourced]\nglobal.rgbToHsl(rgbaArray) -> HSLA Array (4-dimensional) [docs-sourced]\nComp.thisComp.layer(index) -> Layer, Light, or Camera object [docs-sourced]\nComp.thisComp.layerByComment(comment) -> Layer, Light, or Camera object [docs-sourced]\nFootage.footage(\"myFile\").dataKeyCount(dataPath) -> The number of samples in the dynamic data stream. [docs-sourced]\nFootage.footage(\"myFile\").dataKeyTimes(dataPath[, t0=startTime][, t1=endTime]) -> Array of numbers representing the sample times. [docs-sourced]\nFootage.footage(\"myFile\").dataKeyValues(dataPath[, t0=startTime][, t1=endTime]) -> Array of numbers representing the sample values. [docs-sourced]\nFootage.footage(\"myFile\").dataValue(dataPath) -> The value of the data stream. [docs-sourced]\nglobal.comp(name) -> Comp [docs-sourced]\nglobal.footage(name) -> Footage [docs-sourced]\nglobal.posterizeTime(updatesPerSecond) -> Number [docs-sourced]\nglobal.ease(t, tMin, tMax, value1, value2) | ease(t, value1, value2) -> Number or Array [docs-sourced]\nglobal.easeIn(t, tMin, tMax, value1, value2) | easeIn(t, value1, value2) -> Number or Array [docs-sourced]\nglobal.easeOut(t, tMin, tMax, value1, value2) | easeOut(t, value1, value2) -> Number or Array [docs-sourced]\nglobal.linear(t, tMin, tMax, value1, value2) | linear(t, value1, value2) -> Number or Array [docs-sourced]\nLayer.thisLayer.effect(name) -> Effect [docs-sourced]\nLayer.thisLayer.fromComp(point[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.fromCompToSurface(point[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.fromCompVec(vec[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.fromWorld(point[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.fromWorldVec(vec[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.mask(name) -> Mask [docs-sourced]\nLayer.thisLayer.sampleImage(point[, radius=[0.5, 0.5]][, postEffect=true][, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.sourceRectAtTime(t = time, includeExtents = false) -> An object with four attributes: {top, left, width, height} [docs-sourced]\nLayer.thisLayer.sourceTime([t=time]) -> Number [docs-sourced]\nLayer.thisLayer.toComp(point[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.toCompVec(vec[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.toWorld(point[, t=time]) -> unspecified [docs-sourced]\nLayer.thisLayer.toWorldVec(vec[, t=time]) -> unspecified [docs-sourced]\nMarker.thisComp.marker.key(index) -> unspecified [docs-sourced]\nMarker.thisComp.marker.nearestKey(t) -> MarkerKey [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.createPath(points=[[0,0], [100,0], [100,100], [0,100]], inTangents=[], outTangents=[], isclosed=true) -> Path [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.inTangents([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.isClosed() -> Boolean [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.normalOnPath(percentage=0.5, t=time) -> A number pair array [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.outTangents([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.pointOnPath([percentage=0.5][, t=time]) -> A number pair array [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.points([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [docs-sourced]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.tangentOnPath([percentage=0.5][, t=time]) -> A number pair array [docs-sourced]\nEffect.thisLayer.effect(\"Bulge\").param(name) -> Property object [docs-sourced]\nProperty.thisLayer.position.key(index) | thisLayer.position.key(markerName) -> Key or MarkerKey [docs-sourced]\nProperty.thisLayer.position.loopIn([type=\"cycle\"][, numKeyframes=0]) -> A looped value of the same property type as this current property. [docs-sourced]\nProperty.thisLayer.position.loopInDuration([type=\"cycle\"][, duration=0]) -> A looped value of the same property type as this current property. [docs-sourced]\nProperty.thisLayer.position.loopOut([type=\"cycle\"][, numKeyframes=0]) -> A looped value of the same property type as this current property. [docs-sourced]\nProperty.thisLayer.position.loopOutDuration([type=\"cycle\"][, duration=0]) -> A looped value of the same property type as this current property. [docs-sourced]\nProperty.thisLayer.position.nearestKey(t) -> Key or MarkerKey [docs-sourced]\nProperty.thisLayer.position.nextKey(time) -> Key or MarkerKey [docs-sourced]\nProperty.thisLayer.position.previousKey(time) -> Key or MarkerKey [docs-sourced]\nProperty.thisLayer.position.propertyGroup([countUp=1]) -> PropertyGroup object [docs-sourced]\nProperty.thisLayer.position.smooth([width=.2][, samples=5][, t=time]) -> Number or Array [docs-sourced]\nProperty.thisLayer.position.speedAtTime(t) -> Number [docs-sourced]\nProperty.thisLayer.position.temporalWiggle(freq, amp[, octaves=1][, ampmult=0.5][, t=time]) -> Number or Array [docs-sourced]\nProperty.effect(\"Dropdown Menu Control\")(\"Menu\").textAtTime(time) -> String [docs-sourced]\nProperty.thisLayer.position.valueAtTime(t) -> Number or Array [docs-sourced]\nProperty.thisLayer.position.velocityAtTime(t) -> Number or Array [docs-sourced]\nProperty.thisLayer.position.wiggle(freq, amp[, octaves=1][, ampmult=0.5][, t=time]) -> Number or Array [docs-sourced]\nPropertyGroup.propertyGroup([countUp=1]) -> PropertyGroup object [docs-sourced]\nglobal.gaussRandom([maxValOrArray=1]) | gaussRandom(minValOrArray, maxValOrArray) -> Number or Array [docs-sourced]\nglobal.noise(valOrArray) -> Number [docs-sourced]\nglobal.random([maxValOrArray=1]) | random(minValOrArray, maxValOrArray) -> Number or Array [docs-sourced]\nglobal.seedRandom(offset[, timeless=false]) -> None [docs-sourced]";
+export const EXPRESSION_INDEX = "Comp.thisComp.layer(index) -> Layer, Light, or Camera object [verified]\nglobal.posterizeTime(updatesPerSecond) -> Number [verified]\nglobal.linear(t, tMin, tMax, value1, value2) | linear(t, value1, value2) -> Number or Array [verified]\nLayer.thisLayer.fromComp(point[, t=time]) -> unspecified [verified]\nLayer.thisLayer.fromCompVec(vec[, t=time]) -> unspecified [verified]\nLayer.thisLayer.fromWorld(point[, t=time]) -> unspecified [verified]\nLayer.thisLayer.fromWorldVec(vec[, t=time]) -> unspecified [verified]\nLayer.thisLayer.toCompVec(vec[, t=time]) -> unspecified [verified]\nProperty.thisLayer.position.loopIn([type=\"cycle\"][, numKeyframes=0]) -> A looped value of the same property type as this current property. [verified]\nProperty.thisLayer.position.loopInDuration([type=\"cycle\"][, duration=0]) -> A looped value of the same property type as this current property. [verified]\nProperty.thisLayer.position.loopOut([type=\"cycle\"][, numKeyframes=0]) -> A looped value of the same property type as this current property. [verified]\nProperty.thisLayer.position.loopOutDuration([type=\"cycle\"][, duration=0]) -> A looped value of the same property type as this current property. [verified]\nProperty.thisLayer.position.propertyGroup([countUp=1]) -> PropertyGroup object [verified]\nProperty.thisLayer.position.smooth([width=.2][, samples=5][, t=time]) -> Number or Array [verified]\nProperty.thisLayer.position.temporalWiggle(freq, amp[, octaves=1][, ampmult=0.5][, t=time]) -> Number or Array [verified]\nProperty.thisLayer.position.valueAtTime(t) -> Number or Array [verified]\nProperty.thisLayer.position.wiggle(freq, amp[, octaves=1][, ampmult=0.5][, t=time]) -> Number or Array [verified]\nglobal.noise(valOrArray) -> Number [verified]\nglobal.seedRandom(offset[, timeless=false]) -> None [verified]\nSourceText.text.sourceText.createStyle() -> Empty Text Style object. [verified]\nSourceText.text.sourceText.getStyleAt(charIndex[, time]) -> Text Style object [verified]\nglobal.clamp(value, limit1, limit2) -> Number or Array [verified]\nglobal.hexToRgb(hexString) -> Array (4-dimensional) [pending]\nglobal.hslToRgb(hslaArray) -> RGBA Array (4-dimensional) [pending]\nglobal.rgbToHsl(rgbaArray) -> HSLA Array (4-dimensional) [pending]\nComp.thisComp.layerByComment(comment) -> Layer, Light, or Camera object [pending]\nFootage.footage(\"myFile\").dataKeyCount(dataPath) -> The number of samples in the dynamic data stream. [pending]\nFootage.footage(\"myFile\").dataKeyTimes(dataPath[, t0=startTime][, t1=endTime]) -> Array of numbers representing the sample times. [pending]\nFootage.footage(\"myFile\").dataKeyValues(dataPath[, t0=startTime][, t1=endTime]) -> Array of numbers representing the sample values. [pending]\nFootage.footage(\"myFile\").dataValue(dataPath) -> The value of the data stream. [pending]\nglobal.comp(name) -> Comp [pending]\nglobal.footage(name) -> Footage [pending]\nglobal.ease(t, tMin, tMax, value1, value2) | ease(t, value1, value2) -> Number or Array [pending]\nglobal.easeIn(t, tMin, tMax, value1, value2) | easeIn(t, value1, value2) -> Number or Array [pending]\nglobal.easeOut(t, tMin, tMax, value1, value2) | easeOut(t, value1, value2) -> Number or Array [pending]\nLayer.thisLayer.effect(name) -> Effect [pending]\nLayer.thisLayer.fromCompToSurface(point[, t=time]) -> unspecified [pending]\nLayer.thisLayer.mask(name) -> Mask [pending]\nLayer.thisLayer.sampleImage(point[, radius=[0.5, 0.5]][, postEffect=true][, t=time]) -> unspecified [pending]\nLayer.thisLayer.sourceRectAtTime(t = time, includeExtents = false) -> An object with four attributes: {top, left, width, height} [pending]\nLayer.thisLayer.sourceTime([t=time]) -> Number [pending]\nLayer.thisLayer.toComp(point[, t=time]) -> unspecified [pending]\nLayer.thisLayer.toWorld(point[, t=time]) -> unspecified [pending]\nLayer.thisLayer.toWorldVec(vec[, t=time]) -> unspecified [pending]\nMarker.thisComp.marker.key(index) -> unspecified [pending]\nMarker.thisComp.marker.nearestKey(t) -> MarkerKey [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.createPath(points=[[0,0], [100,0], [100,100], [0,100]], inTangents=[], outTangents=[], isclosed=true) -> Path [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.inTangents([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.isClosed() -> Boolean [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.normalOnPath(percentage=0.5, t=time) -> A number pair array [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.outTangents([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.pointOnPath([percentage=0.5][, t=time]) -> A number pair array [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.points([t=time]) -> Array of number pair arrays, rounded to the fourth decimal place [pending]\nPathProperty.thisLayer.mask(\"Mask 1\").maskPath.tangentOnPath([percentage=0.5][, t=time]) -> A number pair array [pending]\nEffect.thisLayer.effect(\"Bulge\").param(name) -> Property object [pending]\nProperty.thisLayer.position.key(index) | thisLayer.position.key(markerName) -> Key or MarkerKey [pending]\nProperty.thisLayer.position.nearestKey(t) -> Key or MarkerKey [pending]\nProperty.thisLayer.position.nextKey(time) -> Key or MarkerKey [pending]\nProperty.thisLayer.position.previousKey(time) -> Key or MarkerKey [pending]\nProperty.thisLayer.position.speedAtTime(t) -> Number [pending]\nProperty.effect(\"Dropdown Menu Control\")(\"Menu\").textAtTime(time) -> String [pending]\nProperty.thisLayer.position.velocityAtTime(t) -> Number or Array [pending]\nPropertyGroup.propertyGroup([countUp=1]) -> PropertyGroup object [pending]\nglobal.gaussRandom([maxValOrArray=1]) | gaussRandom(minValOrArray, maxValOrArray) -> Number or Array [pending]\nglobal.random([maxValOrArray=1]) | random(minValOrArray, maxValOrArray) -> Number or Array [pending]";
 export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
   {
     "name": "hexToRgb",
@@ -63,7 +63,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/color-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "hslToRgb",
@@ -101,7 +101,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/color-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "rgbToHsl",
@@ -120,7 +120,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "all expression properties"
     ],
     "minVersion": null,
-    "example": "rgbToHsl.effect(\"Change Color\")(\"Color To Change\")",
+    "example": "rgbToHsl([0.5, 0.3, 0.8, 1])",
     "pitfalls": [],
     "keywords": [
       "rgbtohsl",
@@ -139,7 +139,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/color-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "layer",
@@ -175,9 +175,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "timeline"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/comp.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "layerByComment",
@@ -215,7 +217,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/comp.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "dataKeyCount",
@@ -253,7 +255,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/footage.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "dataKeyTimes",
@@ -303,7 +305,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/footage.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "dataKeyValues",
@@ -353,7 +355,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/footage.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "dataValue",
@@ -391,7 +393,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/footage.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "comp",
@@ -423,7 +425,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/global.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "footage",
@@ -454,7 +456,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/global.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "posterizeTime",
@@ -491,9 +493,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "composition"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/global.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "ease",
@@ -555,7 +559,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/interpolation.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "easeIn",
@@ -617,7 +621,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/interpolation.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "easeOut",
@@ -679,7 +683,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/interpolation.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "linear",
@@ -737,9 +741,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "between"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/interpolation.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "effect",
@@ -777,7 +783,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/sub-objects.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "fromComp",
@@ -819,9 +825,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "even"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "fromCompToSurface",
@@ -865,7 +873,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "fromCompVec",
@@ -902,9 +910,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "space"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "fromWorld",
@@ -941,9 +951,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "space"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "fromWorldVec",
@@ -980,9 +992,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "space"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "mask",
@@ -1020,7 +1034,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/sub-objects.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "sampleImage",
@@ -1084,7 +1098,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/general.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "sourceRectAtTime",
@@ -1123,7 +1137,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/sub-objects.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "sourceTime",
@@ -1155,7 +1169,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/sub-objects.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "toComp",
@@ -1194,7 +1208,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "toCompVec",
@@ -1231,9 +1245,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "composition"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "toWorld",
@@ -1277,7 +1293,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "toWorldVec",
@@ -1316,7 +1332,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/layer/layer-space-transforms.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "key",
@@ -1354,7 +1370,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/marker-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "nearestKey",
@@ -1390,7 +1406,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/marker-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "createPath",
@@ -1488,7 +1504,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "inTangents",
@@ -1526,7 +1542,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "isClosed",
@@ -1564,7 +1580,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "normalOnPath",
@@ -1608,7 +1624,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "outTangents",
@@ -1646,7 +1662,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "pointOnPath",
@@ -1690,7 +1706,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "points",
@@ -1728,7 +1744,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "tangentOnPath",
@@ -1772,7 +1788,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/path-property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "param",
@@ -1810,7 +1826,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/effect.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "key",
@@ -1843,7 +1859,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "loopIn",
@@ -1887,9 +1903,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "forward"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "loopInDuration",
@@ -1933,9 +1951,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "forward"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "loopOut",
@@ -1979,9 +1999,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "back"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "loopOutDuration",
@@ -2025,9 +2047,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "back"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "nearestKey",
@@ -2061,7 +2085,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "nextKey",
@@ -2099,7 +2123,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "previousKey",
@@ -2137,7 +2161,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "propertyGroup",
@@ -2173,9 +2197,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "brush"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "smooth",
@@ -2223,9 +2249,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "smaller"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "speedAtTime",
@@ -2259,7 +2287,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "temporalWiggle",
@@ -2319,9 +2347,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "alters"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "textAtTime",
@@ -2359,7 +2389,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/dropdown.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "valueAtTime",
@@ -2395,9 +2425,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "examples"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "velocityAtTime",
@@ -2431,7 +2463,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "wiggle",
@@ -2491,9 +2523,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "detailed"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/property.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "propertyGroup",
@@ -2530,7 +2564,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/objects/propertygroup.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "gaussRandom",
@@ -2568,7 +2602,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/random-numbers.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "noise",
@@ -2604,9 +2638,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "means"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/random-numbers.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "random",
@@ -2644,7 +2680,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/random-numbers.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "seedRandom",
@@ -2688,9 +2724,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "default"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/random-numbers.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "createStyle",
@@ -2719,9 +2757,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "specific"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/sourcetext.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "getStyleAt",
@@ -2763,9 +2803,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "time"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/sourcetext.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "replaceText",
@@ -2815,7 +2857,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setAllCaps",
@@ -2865,7 +2907,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setApplyFill",
@@ -2915,7 +2957,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setApplyStroke",
@@ -2965,7 +3007,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setAutoLeading",
@@ -3015,7 +3057,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setBaselineDirection",
@@ -3065,7 +3107,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setBaselineOption",
@@ -3115,7 +3157,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setBaselineShift",
@@ -3165,7 +3207,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setDigitSet",
@@ -3215,7 +3257,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setDirection",
@@ -3251,7 +3293,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setEveryLineComposer",
@@ -3287,7 +3329,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFauxBold",
@@ -3337,7 +3379,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFauxItalic",
@@ -3387,7 +3429,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFillColor",
@@ -3437,7 +3479,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFirstLineIndent",
@@ -3473,7 +3515,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFont",
@@ -3523,7 +3565,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setFontSize",
@@ -3573,7 +3615,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setHangingRoman",
@@ -3610,7 +3652,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setHorizontalScaling",
@@ -3660,7 +3702,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setJustification",
@@ -3698,7 +3740,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setKerning",
@@ -3742,7 +3784,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setKerningType",
@@ -3792,7 +3834,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setLeading",
@@ -3842,7 +3884,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setLeadingType",
@@ -3876,7 +3918,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setLeftMargin",
@@ -3911,7 +3953,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setLigature",
@@ -3961,7 +4003,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setLineJoin",
@@ -4011,7 +4053,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setRightMargin",
@@ -4046,7 +4088,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setSmallCaps",
@@ -4096,7 +4138,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setSpaceAfter",
@@ -4132,7 +4174,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setSpaceBefore",
@@ -4168,7 +4210,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setStrokeColor",
@@ -4218,7 +4260,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setStrokeWidth",
@@ -4268,7 +4310,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setText",
@@ -4306,7 +4348,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setTracking",
@@ -4356,7 +4398,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setTsume",
@@ -4406,7 +4448,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "setVerticalScaling",
@@ -4456,7 +4498,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/text/style.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "framesToTime",
@@ -4500,7 +4542,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "timeToCurrentFormat",
@@ -4556,7 +4598,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "timeToFeetAndFrames",
@@ -4610,7 +4652,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "timeToFrames",
@@ -4660,7 +4702,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "timeToNTSCTimecode",
@@ -4706,7 +4748,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "timeToTimecode",
@@ -4752,7 +4794,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/time-conversion.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "add",
@@ -4789,7 +4831,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "clamp",
@@ -4837,9 +4879,11 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
       "limit1"
     ],
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
-    "verifiedAEVersion": null,
-    "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedAEVersion": "26.3x87",
+    "verifiedEngines": [
+      "javascript-1.0"
+    ],
+    "verifiedStatus": "verified"
   },
   {
     "name": "cross",
@@ -4883,7 +4927,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "degreesToRadians",
@@ -4915,7 +4959,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/other-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "div",
@@ -4955,7 +4999,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "dot",
@@ -4995,7 +5039,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "length",
@@ -5039,7 +5083,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "lookAt",
@@ -5083,7 +5127,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "mul",
@@ -5123,7 +5167,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "normalize",
@@ -5161,7 +5205,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "radiansToDegrees",
@@ -5193,7 +5237,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/other-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   },
   {
     "name": "sub",
@@ -5230,7 +5274,7 @@ export const EXPRESSIONS_DETAIL: ExpressionDetail[] = [
     "source": "docsforadobe/after-effects-expression-reference@a5c5c5066d0395239d524510ace060963f5c0d33:docs/general/vector-math.md",
     "verifiedAEVersion": null,
     "verifiedEngines": [],
-    "verifiedStatus": "docs-sourced"
+    "verifiedStatus": "pending"
   }
 ];
 export const EXPRESSION_FUNCTION_NAMES: string[] = ["add","clamp","comp","createPath","createStyle","cross","dataKeyCount","dataKeyTimes","dataKeyValues","dataValue","degreesToRadians","div","dot","ease","easeIn","easeOut","effect","footage","framesToTime","fromComp","fromCompToSurface","fromCompVec","fromWorld","fromWorldVec","gaussRandom","getStyleAt","hexToRgb","hslToRgb","inTangents","isClosed","key","layer","layerByComment","length","linear","lookAt","loopIn","loopInDuration","loopOut","loopOutDuration","mask","mul","nearestKey","nextKey","noise","normalOnPath","normalize","outTangents","param","pointOnPath","points","posterizeTime","previousKey","propertyGroup","radiansToDegrees","random","replaceText","rgbToHsl","sampleImage","seedRandom","setAllCaps","setApplyFill","setApplyStroke","setAutoLeading","setBaselineDirection","setBaselineOption","setBaselineShift","setDigitSet","setDirection","setEveryLineComposer","setFauxBold","setFauxItalic","setFillColor","setFirstLineIndent","setFont","setFontSize","setHangingRoman","setHorizontalScaling","setJustification","setKerning","setKerningType","setLeading","setLeadingType","setLeftMargin","setLigature","setLineJoin","setRightMargin","setSmallCaps","setSpaceAfter","setSpaceBefore","setStrokeColor","setStrokeWidth","setText","setTracking","setTsume","setVerticalScaling","smooth","sourceRectAtTime","sourceTime","speedAtTime","sub","tangentOnPath","temporalWiggle","textAtTime","timeToCurrentFormat","timeToFeetAndFrames","timeToFrames","timeToNTSCTimecode","timeToTimecode","toComp","toCompVec","toWorld","toWorldVec","valueAtTime","velocityAtTime","wiggle"];

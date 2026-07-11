@@ -446,6 +446,9 @@ function validateExpressionRecord(file, record) {
   if (record.minVersion !== undefined && record.minVersion !== null && typeof record.minVersion !== "string") {
     failInvalidExpression(file, "minVersion must be a string or null");
   }
+  if (record.probe !== undefined && typeof record.probe !== "string") {
+    failInvalidExpression(file, "probe must be a string when present");
+  }
   return {
     name: record.name,
     object: record.object,
@@ -463,9 +466,9 @@ function validateExpressionRecord(file, record) {
     pitfalls: record.pitfalls.map(String),
     keywords: record.keywords.map(String),
     source: record.source,
-    verifiedAEVersion: record.verifiedAEVersion || null,
-    verifiedEngines: Array.isArray(record.verifiedEngines) ? record.verifiedEngines.map(String) : [],
-    verifiedStatus: record.verifiedStatus,
+    verifiedAEVersion: null,
+    verifiedEngines: [],
+    verifiedStatus: "pending",
   };
 }
 
@@ -519,12 +522,10 @@ function readExpressions() {
       if (seen.has(key)) failInvalidExpression(relative(expressionFunctionsDir, filePath), `duplicate ${key}`);
       seen.add(key);
       const verified = verification.get(key) || verification.get(record.name);
-      if (verified) {
-        if (verified.status === "verified" || verified.status === "failed") {
-          record.verifiedStatus = verified.status;
-          record.verifiedAEVersion = verified.aeVersion || verified.verifiedAEVersion || record.verifiedAEVersion;
-          record.verifiedEngines = verified.engines || verified.verifiedEngines || record.verifiedEngines;
-        }
+      if (verified?.status === "verified") {
+        record.verifiedStatus = "verified";
+        record.verifiedAEVersion = verified.aeVersion || verified.verifiedAEVersion || null;
+        record.verifiedEngines = verified.engines || verified.verifiedEngines || [];
       }
       records.push(record);
     }
@@ -666,9 +667,13 @@ const expressionGotchas = existsSync(expressionGotchasFile)
   ? readFileSync(expressionGotchasFile, "utf-8")
   : "";
 const expressionFunctionNames = Array.from(new Set(expressions.map((record) => record.name))).sort();
+const expressionIndexRecords = [
+  ...expressions.filter((record) => record.verifiedStatus === "verified"),
+  ...expressions.filter((record) => record.verifiedStatus !== "verified"),
+];
 const expressionIndexLines = [];
-for (const record of expressions) {
-  const status = record.verifiedStatus === "verified" ? "verified" : record.verifiedStatus;
+for (const record of expressionIndexRecords) {
+  const status = record.verifiedStatus === "verified" ? "verified" : "pending";
   const line = `${record.object}.${record.signature} -> ${record.returns} [${status}]`;
   if (expressionIndexLines.join("\n").length + line.length + 1 > 6000) break;
   expressionIndexLines.push(line);
@@ -698,7 +703,7 @@ export interface ExpressionDetail {
   source: string;
   verifiedAEVersion: string | null;
   verifiedEngines: string[];
-  verifiedStatus: string;
+  verifiedStatus: "verified" | "pending";
 }
 
 export const EXPRESSION_INDEX = ${JSON.stringify(expressionIndexLines.join("\n"))};
@@ -708,8 +713,12 @@ export const EXPRESSION_GOTCHAS = ${JSON.stringify(expressionGotchas)};
 `
 );
 
+const verifiedExpressionCount = expressions.filter(
+  (record) => record.verifiedStatus === "verified"
+).length;
+const pendingExpressionCount = expressions.length - verifiedExpressionCount;
 console.log(
-  `✓ expressions.ts — ${expressions.length} records, ${expressionFunctionNames.length} function names, ${expressionIndexLines.join("\n").length} index chars`
+  `✓ expressions.ts — ${expressions.length} records (${verifiedExpressionCount} verified, ${pendingExpressionCount} pending), ${expressionFunctionNames.length} function names, ${expressionIndexLines.join("\n").length} index chars`
 );
 
 // -- Generate effects detail catalog -----------------------------------------
