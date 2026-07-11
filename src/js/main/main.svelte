@@ -889,6 +889,7 @@
           runPrompt: async (text) => {
             if (!activeProvider) throw new Error("No provider configured in the panel.");
             lastActionRunResult = null;
+            lastActionResult = null;
             await handlePromptSend(text);
           },
           getContext: () => buildContext(),

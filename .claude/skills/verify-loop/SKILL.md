@@ -44,6 +44,8 @@ pnpm recipes:check
 
 Never promote a no-op result. An empty state diff is inconclusive.
 
+The base fixture (`fixtures/verify-scene.jsx`) leaves a solid selected. Recipes with other preconditions supply `fixtures/recipe-setup/<id>.jsx`, run after the reset to adjust selection/scene (e.g. the text recipes select the text layer; `track-matte-setup` selects two). Add one when a recipe fails only because its precondition (a text layer, two layers, a specific effect) is unmet in the base scene.
+
 ## 3. Verify prompts end to end
 
 Run the provider-to-AE fixtures:

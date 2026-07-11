@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import {
+  existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -14,6 +15,7 @@ import { wrapUndoGroup } from "./lib/wrap-undo-group.mjs";
 const root = resolve(import.meta.dirname, "..");
 const recipesDir = join(root, "recipes");
 const fixturePath = join(root, "fixtures", "verify-scene.jsx");
+const setupDir = join(root, "fixtures", "recipe-setup");
 const sessionDir = join(root, ".session");
 const tempDir = join(sessionDir, "recipe-verification-tmp");
 const reportPath = join(sessionDir, "recipe-verification.json");
@@ -134,6 +136,20 @@ async function resetFixture(fixture) {
   }
 }
 
+// Recipes with preconditions beyond the base fixture (a selected solid) supply an
+// optional fixtures/recipe-setup/<id>.jsx to adjust selection/scene before the run.
+function readRecipeSetup(id) {
+  const setupPath = join(setupDir, id + ".jsx");
+  return existsSync(setupPath) ? readFileSync(setupPath, "utf8") : null;
+}
+
+async function applyRecipeSetup(setup) {
+  const result = await evalES(setup);
+  if (!result || result.error || !result.success) {
+    throw new Error("Recipe setup failed: " + String(result?.error || "unknown error"));
+  }
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const allRecipes = readRecipes();
@@ -155,6 +171,8 @@ async function main() {
 
       try {
         await resetFixture(fixture);
+        const setup = readRecipeSetup(recipe.id);
+        if (setup) await applyRecipeSetup(setup);
         const runResult = await runJsxFile(tempPath);
         results.push({
           id: recipe.id,
