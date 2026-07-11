@@ -1519,6 +1519,22 @@ function getAnimationDigest(layer: Layer) {
   };
 }
 
+function getTrackMatteSnapshot(layer: Layer): string {
+  try {
+    var av = layer as any;
+    var label = getTrackMatteLabel(av.trackMatteType);
+    if (!label) return "";
+    var matteName = "";
+    // trackMatteLayer exists in AE 23+ only; guarded so legacy hosts still report the type.
+    try {
+      var matteLayer = av.trackMatteLayer;
+      if (matteLayer) matteName = matteLayer.name;
+    } catch (e) {}
+    return matteName ? label + " via " + matteName : label;
+  } catch (e) {}
+  return "";
+}
+
 function buildRunSnapshot(): RunSnapshot | null {
   var comp = getActiveComp();
   if (!comp) return null;
@@ -1537,6 +1553,7 @@ function buildRunSnapshot(): RunSnapshot | null {
       item.expressionDigest = animation.expressionDigest;
       item.expressionCount = animation.expressionCount;
       item.keyframes = animation.keyframes;
+      item.trackMatte = getTrackMatteSnapshot(layer);
       try { item.inPoint = layer.inPoint; } catch (e) {}
       try { item.outPoint = layer.outPoint; } catch (e) {}
     }

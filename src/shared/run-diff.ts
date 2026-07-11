@@ -8,6 +8,7 @@ export interface RunLayerSnapshot {
   keyframes?: number;
   inPoint?: number;
   outPoint?: number;
+  trackMatte?: string;
 }
 
 export interface RunSnapshot {
@@ -116,6 +117,11 @@ export function diffRunSnapshots(
     }
     if (numberChanged(matched.inPoint, afterLayer.inPoint) || numberChanged(matched.outPoint, afterLayer.outPoint)) {
       push(notes, 'Layer timing changed on "' + afterLayer.name + '"');
+    }
+    var beforeMatte = matched.trackMatte || "";
+    var afterMatte = afterLayer.trackMatte || "";
+    if (beforeMatte !== afterMatte) {
+      push(notes, 'Track matte changed on "' + afterLayer.name + '" (' + (beforeMatte || "none") + " -> " + (afterMatte || "none") + ')');
     }
   }
 
