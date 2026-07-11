@@ -14,6 +14,7 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
+import { wrapUndoGroup } from "./lib/wrap-undo-group.mjs";
 
 const args = process.argv.slice(2);
 const sourceArgIdx = args.indexOf("--source");
@@ -103,35 +104,6 @@ function validateRecipe(recipe) {
   if (typeof recipe.script !== "string" || recipe.script.trim() === "") {
     fail("recipe " + recipe.id + " has no script");
   }
-}
-
-function indentScript(source) {
-  return source
-    .split(/\r?\n/)
-    .map((line) => (line.trim() === "" ? "" : "  " + line))
-    .join("\n");
-}
-
-function wrapUndoGroup(script) {
-  const trimmed = script.trim();
-  const beginMatch = trimmed.match(/^\s*app\.beginUndoGroup\(([^)]*)\);\s*\r?\n?/);
-  const endMatch = trimmed.match(/\r?\n?\s*app\.endUndoGroup\(\);\s*$/);
-
-  if (!beginMatch || !endMatch) return trimmed;
-
-  const body = trimmed
-    .replace(/^\s*app\.beginUndoGroup\(([^)]*)\);\s*\r?\n?/, "")
-    .replace(/\r?\n?\s*app\.endUndoGroup\(\);\s*$/, "")
-    .trim();
-
-  return [
-    "app.beginUndoGroup(" + beginMatch[1] + ");",
-    "try {",
-    indentScript(body),
-    "} finally {",
-    "  app.endUndoGroup();",
-    "}",
-  ].join("\n");
 }
 
 const recipes = readRecipes();

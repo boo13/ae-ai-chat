@@ -61,6 +61,9 @@ if (action) runAction(config, action);
 
 export default defineConfig({
   plugins: [svelte(), cep(config)],
+  define: {
+    __AE_TEST_HARNESS__: JSON.stringify(!isPackage),
+  },
   resolve: {
     alias: [{ find: "@esTypes", replacement: path.resolve(__dirname, "src") }],
   },

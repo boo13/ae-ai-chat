@@ -27,7 +27,9 @@
     "symlink": "cross-env BOLT_ACTION=symlink node ./node_modules/vite/bin/vite.js",
     "recipes:check": "node scripts/check-recipes.mjs",
     "errors:summarize": "node scripts/error-log-summary.mjs",
-    "recipes:export": "node scripts/export-recipe-scripts.mjs"
+    "recipes:export": "node scripts/export-recipe-scripts.mjs",
+    "recipes:verify": "node scripts/verify-recipes.mjs",
+    "verify:e2e": "node scripts/verify-e2e.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",
@@ -56,6 +58,7 @@
     "@types/trusted-types": "^2.0.2",
     "babel-plugin-transform-scss": "^1.2.0",
     "babel-preset-env": "^1.7.0",
+    "chrome-remote-interface": "^0.34.0",
     "core-js": "3",
     "cross-env": "^7.0.3",
     "fs-extra": "^10.0.0",

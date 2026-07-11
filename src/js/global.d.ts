@@ -6,6 +6,8 @@ declare module "*.jpg";
 declare module "*.svg";
 
 declare global {
+  const __AE_TEST_HARNESS__: boolean;
+
   interface Window {
     cep_node: cep_node;
     cep: cep;

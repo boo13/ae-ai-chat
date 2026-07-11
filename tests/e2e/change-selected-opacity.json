@@ -1,0 +1,8 @@
+{
+  "prompt": "Set the selected solid layer's Opacity to 55 using its full Transform property path, then run the AI Action immediately.",
+  "expectDiffContains": [
+    "Transform changed",
+    "opacity"
+  ],
+  "expectNoErrors": true
+}
