@@ -1,0 +1,7 @@
+{
+  "prompt": "Create one shape layer named E2E Shape in the active composition. Add a rectangle path and a visible fill, then run the AI Action immediately.",
+  "expectDiffContains": [
+    "Layers added: E2E Shape"
+  ],
+  "expectNoErrors": true
+}

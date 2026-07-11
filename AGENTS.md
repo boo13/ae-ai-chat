@@ -154,10 +154,11 @@ node scripts/generate-knowledge.mjs --recipes-source ./recipes
 
 Dev installs log every AI Action failure (validation, runtime, expression) with the script and the injected recipe IDs to `.session/error-log.jsonl` (`src/js/lib/error-log.ts`). This corpus is the raw material for improving the knowledge base — mine it periodically:
 
-1. Run `node scripts/error-log-summary.mjs` to see recurring failure patterns.
-2. A repeated runtime pitfall → add it to the upstream `gotchas.md` and regenerate.
-3. A repeated "model couldn't compose X" failure → author a recipe for X.
-4. A failure that should have been caught before execution → add a validator rule (`src/js/lib/knowledge/validator.ts`).
+1. Run the `/verify-loop` skill with AE and the dev panel open. It verifies pending recipes against live AE, runs prompt E2E fixtures, and invokes `pnpm errors:summarize` to cluster failures.
+2. Use `pnpm recipes:verify --only <id>` while iterating on a specific recipe; add `--promote` after it passes to remove its pending marker.
+3. A repeated runtime pitfall → add it to the upstream `gotchas.md` and regenerate.
+4. A repeated zero-recipe failure → author a composable recipe, verify it in live AE, regenerate the corpus, and run `pnpm recipes:check`.
+5. A failure that should have been caught before execution → add a validator rule (`src/js/lib/knowledge/validator.ts`).
 
 ## Providers
 

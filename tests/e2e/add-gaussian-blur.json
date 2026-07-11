@@ -1,0 +1,7 @@
+{
+  "prompt": "Add the Gaussian Blur 2 effect with match name ADBE Gaussian Blur 2 to the selected solid, set Blurriness to 20, and run the AI Action immediately.",
+  "expectDiffContains": [
+    "Effects on"
+  ],
+  "expectNoErrors": true
+}

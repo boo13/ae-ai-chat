@@ -48,6 +48,26 @@ test("reports transform, effect parameter, expression, and keyframe changes", ()
   assert.match(notes, /Expressions changed.*0 -> 1/);
 });
 
+test("reports track matte changes", () => {
+  const before = snapshot();
+  const after = snapshot({
+    layers: [{ ...before.layers[0], trackMatte: "alpha via Matte" }],
+  });
+  const notes = diffRunSnapshots(before, after).join("\n");
+  assert.match(notes, /Track matte changed on "Title" \(none -> alpha via Matte\)/);
+});
+
+test("ignores unchanged or absent track matte state", () => {
+  const withMatte = snapshot({ layers: [{ name: "Title", effects: 1, trackMatte: "luma" }] });
+  assert.equal(
+    diffRunSnapshots(withMatte, withMatte).join("\n").includes("Track matte"),
+    false
+  );
+  const before = snapshot({ layers: [{ name: "Title", effects: 1 }] });
+  const after = snapshot({ layers: [{ name: "Title", effects: 1 }] });
+  assert.equal(diffRunSnapshots(before, after).join("\n").includes("Track matte"), false);
+});
+
 test("handles duplicate layer names without prototype-key collisions", () => {
   const before = snapshot({
     numLayers: 2,

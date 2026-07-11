@@ -88,6 +88,7 @@
   // active comp, included in the next message's context so the model can
   // confirm the action did what it claimed.
   let lastActionResult: LastActionResult | null = null;
+  let lastActionRunResult: unknown = null;
 
   function recordActionSuccess(runResult: unknown, summary: string): string[] {
     const result = runResult && typeof runResult === "object"
@@ -581,6 +582,7 @@
                   text: "Running AI Action...",
                 });
                 const runResult = await runAiAction(context.projectRoot);
+                lastActionRunResult = runResult;
                 const exprErrors: ExpressionError[] =
                   (runResult as any)?.expressionErrors || [];
 
@@ -807,6 +809,7 @@
 
         manualScript = readAiActionScript(sessionProjectRoot);
         const runResult = await runAiAction(sessionProjectRoot);
+        lastActionRunResult = runResult;
         const exprErrors: ExpressionError[] = (runResult as any)?.expressionErrors || [];
 
         if (runResult && "error" in runResult && runResult.error) {
@@ -877,6 +880,25 @@
 
   onMount(() => {
     let disposed = false;
+    let uninstallTestHarness: (() => void) | null = null;
+
+    if (__AE_TEST_HARNESS__ && runtimeEnvironment.isDevInstall) {
+      import("../lib/test-harness").then(({ installTestHarness }) => {
+        if (disposed) return;
+        uninstallTestHarness = installTestHarness({
+          runPrompt: async (text) => {
+            if (!activeProvider) throw new Error("No provider configured in the panel.");
+            lastActionRunResult = null;
+            lastActionResult = null;
+            await handlePromptSend(text);
+          },
+          getContext: () => buildContext(),
+          getLastActionResult: () => lastActionResult,
+          getLastRunResult: () => lastActionRunResult,
+          getLastError: () => lastError,
+        });
+      }).catch(() => {});
+    }
 
     const lastProviderId = localStorage.getItem("selectedProviderId");
     if (lastProviderId) {
@@ -908,6 +930,7 @@
 
     return () => {
       disposed = true;
+      uninstallTestHarness?.();
       cancelStatusClear();
       stopStatusTimer();
       if (sessionProjectRoot) {
