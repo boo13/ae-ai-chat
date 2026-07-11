@@ -68,6 +68,29 @@ test("ignores unchanged or absent track matte state", () => {
   assert.equal(diffRunSnapshots(before, after).join("\n").includes("Track matte"), false);
 });
 
+test("reports keyframe easing changes when the count is unchanged", () => {
+  const before = snapshot({
+    layers: [{ name: "Title", effects: 1, keyframes: 2, keyframeDigest: "linear" }],
+  });
+  const after = snapshot({
+    layers: [{ name: "Title", effects: 1, keyframes: 2, keyframeDigest: "eased" }],
+  });
+  const notes = diffRunSnapshots(before, after).join("\n");
+  assert.match(notes, /Keyframe easing changed on "Title"/);
+});
+
+test("prefers keyframe count over easing when both change", () => {
+  const before = snapshot({
+    layers: [{ name: "Title", effects: 1, keyframes: 2, keyframeDigest: "linear" }],
+  });
+  const after = snapshot({
+    layers: [{ name: "Title", effects: 1, keyframes: 4, keyframeDigest: "eased" }],
+  });
+  const notes = diffRunSnapshots(before, after).join("\n");
+  assert.match(notes, /Keyframes changed on "Title" \(2 -> 4\)/);
+  assert.equal(notes.includes("Keyframe easing changed"), false);
+});
+
 test("handles duplicate layer names without prototype-key collisions", () => {
   const before = snapshot({
     numLayers: 2,

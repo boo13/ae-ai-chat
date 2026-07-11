@@ -44,7 +44,9 @@ pnpm recipes:check
 
 Never promote a no-op result. An empty state diff is inconclusive.
 
-The base fixture (`fixtures/verify-scene.jsx`) leaves a solid selected. Recipes with other preconditions supply `fixtures/recipe-setup/<id>.jsx`, run after the reset to adjust selection/scene (e.g. the text recipes select the text layer; `track-matte-setup` selects two). Add one when a recipe fails only because its precondition (a text layer, two layers, a specific effect) is unmet in the base scene.
+The base fixture (`fixtures/verify-scene.jsx`) leaves a solid selected. Recipes with other preconditions supply `fixtures/recipe-setup/<id>.jsx`, run after the reset to adjust selection/scene: the text recipes select the text layer, `track-matte-setup`/`expression-follow-delay` select two layers, and the keyframe recipes (`loop-keyframes`, `bounce-overshoot-expression`, `easy-ease-preset`) add Position keyframes and select that property. Add one when a recipe fails only because its precondition is unmet in the base scene.
+
+Recipes that call `alert()` (e.g. `expression-error-scan`) are reported as `SKIP` — a modal dialog would block the driver, and a read-only diagnostic has no state diff to verify. Its job (surfacing expression errors) is already covered by the harness's own `expressionErrors` capture. Verify such recipes manually if needed.
 
 ## 3. Verify prompts end to end
 

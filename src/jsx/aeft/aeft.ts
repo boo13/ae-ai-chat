@@ -1501,10 +1501,35 @@ function getEffectDigest(layer: Layer): string {
 
 function getAnimationDigest(layer: Layer) {
   var expressionParts: string[] = [];
+  var interpolationParts: string[] = [];
   var expressionCount = 0;
   var keyframes = 0;
   walkLeafProperties(layer, function (prop) {
-    try { keyframes += prop.numKeys || 0; } catch (e) {}
+    var numKeys = 0;
+    try { numKeys = prop.numKeys || 0; } catch (e) {}
+    keyframes += numKeys;
+    if (numKeys > 0) {
+      // Interpolation/ease is not reflected in numKeys, so hash it separately —
+      // otherwise easing a set of keys reads as "no change".
+      try {
+        var perKey: string[] = [];
+        for (var k = 1; k <= numKeys; k++) {
+          var inType = 0;
+          var outType = 0;
+          var influence = "";
+          try { inType = (prop as any).keyInInterpolationType(k); } catch (e) {}
+          try { outType = (prop as any).keyOutInterpolationType(k); } catch (e) {}
+          try {
+            var inEase = (prop as any).keyInTemporalEase(k);
+            var outEase = (prop as any).keyOutTemporalEase(k);
+            if (inEase && inEase.length) influence += Math.round(inEase[0].influence);
+            if (outEase && outEase.length) influence += ":" + Math.round(outEase[0].influence);
+          } catch (e) {}
+          perKey.push(inType + "/" + outType + "/" + influence);
+        }
+        interpolationParts.push((prop.matchName || prop.name || "") + "=" + perKey.join(","));
+      } catch (e) {}
+    }
     try {
       if ((prop as any).canSetExpression && prop.expressionEnabled && prop.expression) {
         expressionCount++;
@@ -1516,6 +1541,7 @@ function getAnimationDigest(layer: Layer) {
     expressionDigest: fnv1a(expressionParts.join("|")),
     expressionCount: expressionCount,
     keyframes: keyframes,
+    keyframeDigest: fnv1a(interpolationParts.join("|")),
   };
 }
 
@@ -1553,6 +1579,7 @@ function buildRunSnapshot(): RunSnapshot | null {
       item.expressionDigest = animation.expressionDigest;
       item.expressionCount = animation.expressionCount;
       item.keyframes = animation.keyframes;
+      item.keyframeDigest = animation.keyframeDigest;
       item.trackMatte = getTrackMatteSnapshot(layer);
       try { item.inPoint = layer.inPoint; } catch (e) {}
       try { item.outPoint = layer.outPoint; } catch (e) {}
