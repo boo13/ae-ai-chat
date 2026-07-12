@@ -236,7 +236,15 @@ function suggestMatchName(rawValue: string): SuggestedMatch | null {
   return best;
 }
 
+// Common property matchName mistakes the model makes that fuzzy matching misses
+// (too dissimilar to the correct name to score above the similarity threshold).
+const KNOWN_PROPERTY_CORRECTIONS: Record<string, string> = {
+  "ADBE Effect Group": "ADBE Effect Parade",
+};
+
 function suggestPropertyMatchName(rawValue: string): string | undefined {
+  const known = KNOWN_PROPERTY_CORRECTIONS[rawValue];
+  if (known) return known;
   const normalized = normalize(rawValue);
   let bestName: string | undefined;
   let bestScore = 0;

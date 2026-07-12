@@ -154,6 +154,15 @@ test("does not flag a verified non-effect property matchName", () => {
   assert.equal(warnings.length, 0);
 });
 
+test("corrects the common ADBE Effect Group -> ADBE Effect Parade mistake", () => {
+  const warnings = validateScript(
+    'var e = layer.property("ADBE Effect Group").addProperty("ADBE Gaussian Blur 2");'
+  ).warnings.filter((warning) => warning.code === "PROPERTY_MATCHNAME");
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].suggestion, "ADBE Effect Parade");
+  assert.match(warnings[0].message, /Did you mean "ADBE Effect Parade"/);
+});
+
 test("folds concatenated expression strings before syntax checking", () => {
   const script = 'prop.expression = "var x = (" + "1 + 2;";';
   const warnings = validateScript(script).warnings.filter((warning) => warning.code === "EXPR_SYNTAX");
