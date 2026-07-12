@@ -7,7 +7,7 @@ export const RemotionRoot = () => {
     <Composition
       id="AEAIChatPromo"
       component={Promo}
-      durationInFrames={465}
+      durationInFrames={1290}
       fps={30}
       width={1920}
       height={1080}

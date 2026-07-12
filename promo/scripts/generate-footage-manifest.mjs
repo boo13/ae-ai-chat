@@ -7,6 +7,7 @@ const footageDir = path.join(root, 'public', 'footage');
 const output = path.join(root, 'src', 'footage-manifest.generated.ts');
 const filenames = [
   'ae-panel-run.mp4',
+  'panel-autofix.mp4',
   'broadcast-lower-third.mp4',
   'scifi-radar-hud.mp4',
   'kinetic-typography-slam.mp4',
