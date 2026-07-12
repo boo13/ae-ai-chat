@@ -124,9 +124,9 @@ Create these layers in top-to-bottom order:
 - Blend Mode: Normal
 - Effects in order:
   - Glow
-    - Glow Threshold: `50%`
-    - Glow Radius: `500`
-    - Glow Intensity: `0.2`
+    - Glow Threshold: `178` (stored 0-255; this is the UI's 70% -- multiply UI percent by 2.55)
+    - Glow Radius: `260`
+    - Glow Intensity: `0.15`
     - Glow Operation: `Screen`
   - Channel Mixer
     - Blue-Green: `50`
@@ -140,7 +140,7 @@ Create these layers in top-to-bottom order:
   - CC Vignette
     - Amount: `50`
   - Levels
-    - Output Black: `0.076` (Levels channel values are normalized 0-1 in scripting)
+    - Output Black: `0.03` (Levels channel values are normalized 0-1 in scripting)
     - Output White: `0.916`
 
 10. LIGHT LEAKS
