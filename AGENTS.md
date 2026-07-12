@@ -122,7 +122,9 @@ node scripts/generate-knowledge.mjs
 node scripts/generate-knowledge.mjs --source <path-to-verified>
 ```
 
-Outputs to `src/js/lib/knowledge/data/`. **Commit the generated `.ts` files** — no runtime dependency on the corpus. Re-run and commit whenever the upstream corpus changes.
+Outputs to `src/js/lib/knowledge/data/`. **Commit the generated `.ts` files** — no runtime dependency on the corpus.
+
+> **This repo is authoritative.** `../ae-ai-starter` is now behind — the committed `.ts` in `src/js/lib/knowledge/data/` are the source-of-truth product data. A bare `generate-knowledge.mjs` regenerates every catalog from the outdated sibling and would revert newer work, so regenerate only deliberately and `git diff` the result before committing. Recipes are authored in this repo and always regenerated with `--recipes-source ./recipes` (see Action recipes).
 
 Trust provenance tags in the upstream effect JSON: `[VERIFIED]` and `[DOCS]` are reliable; verify `[LLM-GENERATED]` before relying on it.
 
@@ -136,15 +138,13 @@ Expression methods and pitfalls come from `../ae-ai-starter/Scripts/verified/exp
 
 Recipes are authored as individual JSON files with schema `{id, description, keywords[], script, notes?}`. The `script` field must be ES3-compliant ExtendScript wrapped in `app.beginUndoGroup / endUndoGroup`.
 
-**Local authoring (MacBook):** A local `recipes/` directory at the repo root serves as the working corpus. Regenerate with:
+**Authoring:** The `recipes/` directory at the repo root is the authoritative corpus. Regenerate with:
 
 ```bash
 node scripts/generate-knowledge.mjs --recipes-source ./recipes
 ```
 
-**Upstream (Mac Studio):** The canonical home is `../ae-ai-starter/Scripts/recipes/`. When back on the Mac Studio:
-1. Copy `recipes/` subdirectories to `../ae-ai-starter/Scripts/recipes/` (e.g. `cp -r recipes/* ../ae-ai-starter/Scripts/recipes/`)
-2. Re-run `node scripts/generate-knowledge.mjs` (no `--recipes-source` flag) to confirm the upstream path still produces the same output.
+This repo is the source of truth for recipes — the committed `recipes/` JSONs plus the generated `src/js/lib/knowledge/data/recipes.ts`. There is no `ae-ai-starter` copy-back: that sibling is outdated, and its old `Scripts/recipes/` path now holds unrelated `.jsxinc` modules. Always pass `--recipes-source ./recipes`; a bare `generate-knowledge.mjs` targets a default recipe path (`Scripts/verified/recipes`) that no longer exists.
 
 **Tooling:**
 - `pnpm recipes:check` — smoke-tests keyword matching and injection for all recipe IDs
