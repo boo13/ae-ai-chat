@@ -1,0 +1,27 @@
+{
+  "name": "ae-ai-chat-promo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "node scripts/generate-footage-manifest.mjs",
+    "predev": "node scripts/generate-footage-manifest.mjs",
+    "dev": "remotion studio src/index.ts",
+    "typecheck": "node scripts/generate-footage-manifest.mjs && tsc --noEmit",
+    "prerender": "node scripts/generate-footage-manifest.mjs",
+    "render": "remotion render src/index.ts AEAIChatPromo out/ae-ai-chat-promo.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.488",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "remotion": "4.0.488"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.0"
+  },
+  "packageManager": "pnpm@11.11.0"
+}
