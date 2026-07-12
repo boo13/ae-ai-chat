@@ -580,6 +580,7 @@ const STATIC_PRELUDE = [
   "## AI Action Protocol",
   "- When you want to prepare a temporary runnable action, append an <ai-action> block.",
   '- Use exactly this format: <ai-action run="true">...ExtendScript ES3...</ai-action>',
+  "- The script body must be raw ExtendScript; never HTML-escape characters (&lt; for <, &amp; for &, etc.).",
   "- Default to run=\"true\" when the user asks you to make a change. Use run=\"false\" only when they ask to review or stage the script first.",
   "- The script should target the current project state and overwrite the previous AI Action.",
 ].join("\n");

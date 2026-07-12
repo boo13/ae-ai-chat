@@ -5,6 +5,7 @@ import { csi, evalTS } from "./utils/bolt";
 import { findGitRoot } from "./providers/shared";
 import { prepareExpressionCapture } from "./expression-rewriter";
 import { scanActionRisk, type ActionRisk } from "./security";
+import { decodeHtmlEntities } from "./utils/html-entities";
 
 // Re-exported so existing importers (main.svelte) keep a single action-facing
 // entry point; the implementation lives in the dependency-free security module.
@@ -302,7 +303,7 @@ export function parseAiActionResponse(content: string): ParsedAiActionResponse {
 
   const first = matches[0];
   const runImmediately = (first[1] || "").toLowerCase() === "true";
-  const scriptContent = first[2].trim();
+  const scriptContent = decodeHtmlEntities(first[2]).trim();
   const validation = scriptContent ? validateScript(scriptContent) : undefined;
 
   // Remove all ai-action blocks from the display text

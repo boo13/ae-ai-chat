@@ -17,6 +17,7 @@ const sourceFiles = [
   "src/js/lib/expression-rewriter.ts",
   "src/js/lib/security.ts",
   "src/js/lib/update-check.ts",
+  "src/js/lib/utils/html-entities.ts",
   "src/js/lib/cep/node.ts",
   "src/js/lib/knowledge/effects.ts",
   "src/js/lib/knowledge/expressions.ts",
