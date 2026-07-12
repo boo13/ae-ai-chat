@@ -609,6 +609,9 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
       let rest = code.slice(afterIdx);
       const semi = rest.indexOf(";");
       if (semi !== -1) rest = rest.slice(0, semi);
+      const statementStart = code.lastIndexOf(";", m.index - 1) + 1;
+      const statementEnd = semi === -1 ? code.length : afterIdx + semi;
+      const statement = code.slice(statementStart, statementEnd);
 
       const strMatch = rest.match(STRING_LITERAL_RE);
       const numMatch = rest.match(NUMBER_LITERAL_RE);
@@ -625,10 +628,12 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
 
       let message: string | null = null;
       if (strIdx < numIdx) {
-        message =
-          `Warning: ${info.effectDisplayName} "${info.propName}" (${matchName}) is a numeric property — ` +
-          `pass an integer, not a UI label string "${strMatch![2]}".` +
-          (optionList ? ` Verified options: ${optionList}.` : "");
+        if (!/expression/i.test(statement)) {
+          message =
+            `Warning: ${info.effectDisplayName} "${info.propName}" (${matchName}) is a numeric property — ` +
+            `pass an integer, not a UI label string "${strMatch![2]}".` +
+            (optionList ? ` Verified options: ${optionList}.` : "");
+        }
       } else if (info.enumValues) {
         const value = Number(numMatch![0]);
         const verified = Object.values(info.enumValues).some(
@@ -661,11 +666,36 @@ function checkEnumValues(content: string): ScriptValidationWarning[] {
 
 function expectedValueArities(valueType: string): number[] | null {
   if (valueType === "COLOR") return [4];
-  if (valueType === "TwoD" || valueType === "TwoD_SPATIAL") return [2];
-  if (valueType === "ThreeD" || valueType === "ThreeD_SPATIAL") return [3];
+  if (valueType === "TwoD") return [2];
+  if (valueType === "ThreeD") return [3];
+  if (valueType === "TwoD_SPATIAL" || valueType === "ThreeD_SPATIAL") return [2, 3];
   if (valueType === "TwoD_OR_ThreeD" || valueType === "TwoD_OR_ThreeD_SPATIAL") return [2, 3];
   if (valueType === "OneD" || valueType === "LAYER_INDEX" || valueType === "MASK_INDEX") return [1];
   return null;
+}
+
+function checkTemporalEaseArity(content: string): ScriptValidationWarning[] {
+  const warnings: ScriptValidationWarning[] = [];
+  const scanText = commentsBlankedView(content);
+  const callRe = /\.property\(\s*(['"])(ADBE Position|ADBE Anchor Point)\1\s*\)\s*\.setTemporalEaseAtKey\s*\(([^;]*)\)/g;
+  let call: RegExpExecArray | null;
+
+  while ((call = callRe.exec(scanText)) !== null) {
+    const arrays = call[3].match(/\[[^\[\]]*\]/g) || [];
+    const hasTooManyEases = arrays.some(
+      (array) => (array.match(/new\s+KeyframeEase\s*\(/g) || []).length > 1
+    );
+    if (!hasTooManyEases) continue;
+
+    warnings.push({
+      code: "TEMPORAL_EASE_ARITY",
+      invalidMatchName: call[2],
+      message: `${call[2]} is spatial; setTemporalEaseAtKey() takes exactly one KeyframeEase per side for spatial properties.`,
+      occurrences: [getLineColumn(content, call.index)],
+    });
+  }
+
+  return warnings;
 }
 
 function literalArrayArity(value: string): number | null {
@@ -727,6 +757,7 @@ export function validateScript(content: string): ScriptValidationResult {
     ...checkUnknownExpressionFunctions(content),
     ...checkExpressionScriptingApi(content),
     ...checkEnumValues(content),
+    ...checkTemporalEaseArity(content),
   ];
 
   return { errors, warnings };

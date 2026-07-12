@@ -384,7 +384,7 @@ export const RECIPES: RecipeEntry[] = [
       "ease keyframes",
       "eased keyframes"
     ],
-    "script": "app.beginUndoGroup(\"Ease Opacity Keyframes\");\ntry {\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addSolid([1, 0.45, 0.1], \"Eased Opacity\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n  var opacity = layer.property(\"ADBE Transform Group\").property(\"ADBE Opacity\");\n  opacity.setValueAtTime(0, 0);\n  opacity.setValueAtTime(1, 100);\n  var easeIn = new KeyframeEase(0, 80);\n  var easeOut = new KeyframeEase(0, 80);\n  opacity.setTemporalEaseAtKey(1, [easeIn], [easeOut]);\n  opacity.setTemporalEaseAtKey(2, [easeIn], [easeOut]);\n} finally {\n  app.endUndoGroup();\n}",
+    "script": "app.beginUndoGroup(\"Ease Opacity and Position Keyframes\");\ntry {\n  function easeArray(prop, speed, influence) {\n    var n = prop.isSpatial ? 1 : (prop.value instanceof Array ? prop.value.length : 1);\n    var arr = [];\n    for (var i = 0; i < n; i++) arr.push(new KeyframeEase(speed, influence));\n    return arr;\n  }\n  var comp = app.project.activeItem;\n  if (!(comp instanceof CompItem)) {\n    throw new Error(\"Open a composition first.\");\n  }\n  var layer = comp.layers.addSolid([1, 0.45, 0.1], \"Eased Layer\", comp.width, comp.height, comp.pixelAspect, comp.duration);\n  var transform = layer.property(\"ADBE Transform Group\");\n  var opacity = transform.property(\"ADBE Opacity\");\n  var position = transform.property(\"ADBE Position\");\n  opacity.setValueAtTime(0, 0);\n  opacity.setValueAtTime(1, 100);\n  position.setValueAtTime(0, [comp.width / 2 - 200, comp.height / 2]);\n  position.setValueAtTime(1, [comp.width / 2, comp.height / 2]);\n  var opacityEaseIn = easeArray(opacity, 0, 80);\n  var opacityEaseOut = easeArray(opacity, 0, 80);\n  var positionEaseIn = easeArray(position, 0, 80);\n  var positionEaseOut = easeArray(position, 0, 80);\n  opacity.setTemporalEaseAtKey(1, opacityEaseIn, opacityEaseOut);\n  opacity.setTemporalEaseAtKey(2, opacityEaseIn, opacityEaseOut);\n  position.setTemporalEaseAtKey(1, positionEaseIn, positionEaseOut);\n  position.setTemporalEaseAtKey(2, positionEaseIn, positionEaseOut);\n} finally {\n  app.endUndoGroup();\n}",
     "terms": [
       "create",
       "keyframes",
@@ -398,7 +398,7 @@ export const RECIPES: RecipeEntry[] = [
       "eased"
     ],
     "verifiedStatus": "verified",
-    "notes": "setTemporalEaseAtKey takes arrays of KeyframeEase objects. One-dimensional properties use one ease object per side."
+    "notes": "setTemporalEaseAtKey takes one KeyframeEase per value dimension in each in/out array. Spatial properties such as Position and Anchor Point take exactly one KeyframeEase per side regardless of dimensions."
   },
   {
     "id": "reverse-keyframes",

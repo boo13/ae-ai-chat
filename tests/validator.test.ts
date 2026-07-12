@@ -6,6 +6,10 @@ function enumWarnings(script: string) {
   return validateScript(script).warnings.filter((w) => w.code === "ENUM_VALUE");
 }
 
+function temporalEaseWarnings(script: string) {
+  return validateScript(script).warnings.filter((w) => w.code === "TEMPORAL_EASE_ARITY");
+}
+
 test("flags a UI-label string passed to a numeric/enum effect property", () => {
   const script = [
     "app.beginUndoGroup('x');",
@@ -37,6 +41,31 @@ test("does not flag a plain integer when no verified enum map exists", () => {
 test("does not flag a variable value (no literal to validate)", () => {
   const script = 'fx.property("ADBE Fractal Noise-0001").setValue(myFractalType);';
   assert.equal(enumWarnings(script).length, 0);
+});
+
+test("does not flag direct expression assignment to an enum-like property", () => {
+  const script = 'fx.property("ADBE Turbulent Displace-0006").expression = "time * 80";';
+  assert.equal(enumWarnings(script).length, 0);
+});
+
+test("does not flag helper expression assignment to an enum-like property", () => {
+  const script = 'setExpression(fx.property("ADBE Fractal Noise-0023"), "time * 3");';
+  assert.equal(enumWarnings(script).length, 0);
+});
+
+test("does not treat numbers inside an enum property expression as enum values", () => {
+  const script = 'setExpression(fx.property("ADBE Lumetri-0025"), "time * 80");';
+  assert.equal(enumWarnings(script).length, 0);
+});
+
+test("still flags a UI-label string after expression exclusions", () => {
+  const script = 'fx.property("ADBE Fractal Noise-0001").setValue("Rocky");';
+  assert.equal(enumWarnings(script).length, 1);
+});
+
+test("still flags an unverified numeric enum value after expression exclusions", () => {
+  const script = 'setParam(lumetri, "ADBE Lumetri-0025", 999);';
+  assert.equal(enumWarnings(script).length, 1);
 });
 
 test("blocks BlendMode (the enum is BlendingMode)", () => {
@@ -137,6 +166,23 @@ test("still flags a nonsensical arity on an ambiguous transform property", () =>
   const errors = validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY");
   assert.equal(errors.length, 1);
   assert.match(errors[0].message, /expected 2 or 3/);
+});
+
+test("warns when chained spatial temporal ease uses multiple inline eases", () => {
+  const script = 'layer.property("ADBE Transform Group").property("ADBE Position").setTemporalEaseAtKey(1, [new KeyframeEase(0, 80), new KeyframeEase(0, 80)], [new KeyframeEase(0, 80)]);';
+  const warnings = temporalEaseWarnings(script);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0].message, /exactly one KeyframeEase per side/);
+});
+
+test("accepts one inline temporal ease for a chained spatial property", () => {
+  const script = 'layer.property("ADBE Transform Group").property("ADBE Anchor Point").setTemporalEaseAtKey(1, [new KeyframeEase(0, 80)], [new KeyframeEase(0, 80)]);';
+  assert.equal(temporalEaseWarnings(script).length, 0);
+});
+
+test("skips variable-based temporal ease calls", () => {
+  const script = 'position.setTemporalEaseAtKey(1, easeIn, easeOut);';
+  assert.equal(temporalEaseWarnings(script).length, 0);
 });
 
 test("suggests a verified non-effect property matchName typo", () => {
