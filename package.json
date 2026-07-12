@@ -1,7 +1,7 @@
 {
   "name": "ae-ai-chat",
   "private": true,
-  "version": "0.2.3",
+  "version": "0.2.4",
   "author": "Randy Counsman <randycounsman@gmail.com>",
   "repository": {
     "type": "git",
