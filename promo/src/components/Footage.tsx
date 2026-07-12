@@ -49,7 +49,3 @@ export const Grade = ({children}: {children: ReactNode}) => {
     </div>
   );
 };
-
-export const CaptionChip = ({children}: {children: ReactNode}) => {
-  return <div className="caption-chip">{children}</div>;
-};
