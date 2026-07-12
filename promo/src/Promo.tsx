@@ -89,6 +89,7 @@ const EndCard = () => {
         <div className="end-card__rule" />
         <h1>AE AI Chat</h1>
         <p>Prompt-driven After Effects.</p>
+        <p>Ships with 11 verified showcase prompts.</p>
       </div>
     </AbsoluteFill>
   );
@@ -110,21 +111,49 @@ export const Promo = () => {
           tag="AE AI CHAT / RUNNING"
         />
       </Sequence>
-      <Sequence from={225} durationInFrames={27} name="Output one">
+      <Sequence from={225} durationInFrames={33} name="Lower third">
         <Footage
-          filename="output-1.mp4"
-          label="rendered TextureLabs film-damage result"
-          tag="FILM DAMAGE / RESULT"
+          filename="broadcast-lower-third.mp4"
+          label="rigged broadcast lower third over footage"
+          tag="BROADCAST LOWER THIRD / ONE PROMPT"
         />
       </Sequence>
-      <Sequence from={252} durationInFrames={27} name="Output two">
+      <Sequence from={258} durationInFrames={33} name="Radar HUD">
         <Footage
-          filename="output-2.mp4"
-          label="rendered neon flicker or deep-space result"
-          tag="SECOND PROMPT / RESULT"
+          filename="scifi-radar-hud.mp4"
+          label="animated sci-fi radar HUD"
+          tag="SCI-FI RADAR HUD / ONE PROMPT"
         />
       </Sequence>
-      <Sequence from={279} durationInFrames={21} name="End card">
+      <Sequence from={291} durationInFrames={33} name="Kinetic type">
+        <Footage
+          filename="kinetic-typography-slam.mp4"
+          label="kinetic typography slam"
+          tag="KINETIC TYPOGRAPHY / ONE PROMPT"
+        />
+      </Sequence>
+      <Sequence from={324} durationInFrames={33} name="Rain on glass">
+        <Footage
+          filename="rain-on-glass.mp4"
+          label="rain-on-glass blue-hour scene"
+          tag="RAIN ON GLASS / ONE PROMPT"
+        />
+      </Sequence>
+      <Sequence from={357} durationInFrames={33} name="Neon sign">
+        <Footage
+          filename="neon-sign-flicker.mp4"
+          label="flickering neon sign"
+          tag="NEON SIGN FLICKER / ONE PROMPT"
+        />
+      </Sequence>
+      <Sequence from={390} durationInFrames={33} name="Film damage">
+        <Footage
+          filename="texturelabs-filmdamage.mp4"
+          label="TextureLabs film-damage treatment"
+          tag="FILM DAMAGE / ONE PROMPT"
+        />
+      </Sequence>
+      <Sequence from={423} durationInFrames={42} name="End card">
         <EndCard />
       </Sequence>
     </AbsoluteFill>

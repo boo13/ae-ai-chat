@@ -5,7 +5,15 @@ import {fileURLToPath} from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const footageDir = path.join(root, 'public', 'footage');
 const output = path.join(root, 'src', 'footage-manifest.generated.ts');
-const filenames = ['ae-panel-run.mp4', 'output-1.mp4', 'output-2.mp4'];
+const filenames = [
+  'ae-panel-run.mp4',
+  'broadcast-lower-third.mp4',
+  'scifi-radar-hud.mp4',
+  'kinetic-typography-slam.mp4',
+  'rain-on-glass.mp4',
+  'neon-sign-flicker.mp4',
+  'texturelabs-filmdamage.mp4',
+];
 
 await mkdir(footageDir, {recursive: true});
 

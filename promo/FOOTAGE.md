@@ -1,8 +1,8 @@
 # Footage shot list
 
-Record clean clips without cursor flourishes, zoom effects, music, or baked-in titles. Retina screen capture is fine; keep the panel and relevant After Effects UI sharp. Capture 3–5 usable seconds for each file, even though the edit uses shorter excerpts.
+Only one clip needs manual recording. Every other clip is a rendered showcase-prompt output and can be regenerated from the comps the prompts build (see below).
 
-## 1. Panel running in After Effects
+## 1. Panel running in After Effects (manual recording)
 
 Filename: `ae-panel-run.mp4`
 
@@ -14,31 +14,25 @@ Filename: `ae-panel-run.mp4`
 - Record 1920×1080 or larger. A native Retina capture is acceptable and will be cropped to fill 1920×1080.
 - Provide 3–5 seconds of stable, usable action.
 
-## 2. Film-damage output
+## 2. Showcase-prompt outputs (generated)
 
-Filename: `output-1.mp4`
+Filenames:
 
-- Record the rendered composition created from `prompts/TextureLabs_FilmDamage.md`.
-- Show a representative section where grain, scratches, weave, dust, flicker, color treatment, and light leaks are legible.
-- Record the comp output without surrounding desktop UI if possible.
-- Record 1920×1080 or larger for 3–5 seconds.
+```text
+broadcast-lower-third.mp4
+scifi-radar-hud.mp4
+kinetic-typography-slam.mp4
+rain-on-glass.mp4
+neon-sign-flicker.mp4
+texturelabs-filmdamage.mp4
+```
 
-## 3. Second output
+Each is the rendered output of the matching prompt in `prompts/`, H.264 1920×1080 30fps, 5–8 seconds. To regenerate: run the prompt in the panel, render the comp losslessly, then convert with:
 
-Filename: `output-2.mp4`
-
-- Run either `prompts/Neon_Sign_Flicker.md` or `prompts/Deep_Space_Starfield.md` in AE AI Chat.
-- Record only the rendered composition output, choosing a moment with visible motion.
-- Record 1920×1080 or larger for 3–5 seconds.
+```bash
+ffmpeg -i input.mov -c:v libx264 -crf 20 -preset medium -pix_fmt yuv420p -movflags +faststart -an <slug>.mp4
+```
 
 ## Delivery location
 
-Place the files here:
-
-```text
-promo/public/footage/ae-panel-run.mp4
-promo/public/footage/output-1.mp4
-promo/public/footage/output-2.mp4
-```
-
-Run `pnpm dev` or `pnpm render` afterward. The generated footage manifest will detect the clips automatically. Any filename still missing remains a clearly labeled placeholder slate.
+Place all files in `promo/public/footage/`. Run `pnpm dev` or `pnpm render` afterward. The generated footage manifest detects the clips automatically; any missing filename renders as a clearly labeled placeholder slate.

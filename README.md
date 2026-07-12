@@ -13,6 +13,73 @@ Two ways people use it:
 
 ---
 
+## Showcase
+
+Every clip below was created by pasting **one prompt** into the panel. The model builds the layers, effects, keyframes, and expressions live in After Effects — no templates, no manual keyframing. All eleven prompts ship in [`prompts/`](prompts/), verified against live AE, ready to run or remix. Footage treatments are shown on the open-source [Big Buck Bunny](https://peach.blender.org/) short.
+
+<table>
+<tr>
+<td width="50%">
+<a href="prompts/Broadcast_Lower_Third.md"><img src="screenshots/examples/broadcast-lower-third.gif" alt="Broadcast lower third" width="100%"></a>
+<b><a href="prompts/Broadcast_Lower_Third.md">Broadcast Lower Third</a></b> — rigged and art-directable: colors, font, sizes, spacing, and timing all live on one control layer
+</td>
+<td width="50%">
+<a href="prompts/SciFi_Radar_HUD.md"><img src="screenshots/examples/scifi-radar-hud.gif" alt="Sci-fi radar HUD" width="100%"></a>
+<b><a href="prompts/SciFi_Radar_HUD.md">Sci-Fi Radar HUD</a></b> — rotating sweep, trailing blips, ticking sector readouts
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="prompts/Kinetic_Typography_Slam.md"><img src="screenshots/examples/kinetic-typography-slam.gif" alt="Kinetic typography slam" width="100%"></a>
+<b><a href="prompts/Kinetic_Typography_Slam.md">Kinetic Typography Slam</a></b> — word-by-word slam build with eased overshoot and accent underline
+</td>
+<td width="50%">
+<a href="prompts/Rain_On_Glass.md"><img src="screenshots/examples/rain-on-glass.gif" alt="Rain on glass" width="100%"></a>
+<b><a href="prompts/Rain_On_Glass.md">Rain On Glass</a></b> — clinging droplets and run streaks over blue-hour city bokeh
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="prompts/Neon_Sign_Flicker.md"><img src="screenshots/examples/neon-sign-flicker.gif" alt="Neon sign flicker" width="100%"></a>
+<b><a href="prompts/Neon_Sign_Flicker.md">Neon Sign Flicker</a></b> — layered tube glow with electrical flicker
+</td>
+<td width="50%">
+<a href="prompts/TextureLabs_FilmDamage.md"><img src="screenshots/examples/texturelabs-filmdamage.gif" alt="Film damage treatment" width="100%"></a>
+<b><a href="prompts/TextureLabs_FilmDamage.md">TextureLabs Film Damage</a></b> — 10-layer aged-film treatment: grain, scratches, dust, flicker, gate weave, light leaks
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="prompts/Deep_Space_Starfield.md"><img src="screenshots/examples/deep-space-starfield.gif" alt="Deep space starfield" width="100%"></a>
+<b><a href="prompts/Deep_Space_Starfield.md">Deep Space Starfield</a></b> — drifting star layers at three parallax depths
+</td>
+<td width="50%">
+<a href="prompts/Geometric_Loader_Loop.md"><img src="screenshots/examples/geometric-loader-loop.gif" alt="Geometric loader loop" width="100%"></a>
+<b><a href="prompts/Geometric_Loader_Loop.md">Geometric Loader Loop</a></b> — seamless glowing loader with rotating sweep and pulsing core
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="prompts/Procedural_Fog_Atmosphere.md"><img src="screenshots/examples/procedural-fog-atmosphere.gif" alt="Procedural fog atmosphere" width="100%"></a>
+<b><a href="prompts/Procedural_Fog_Atmosphere.md">Procedural Fog Atmosphere</a></b> — fog banks drifting through layered ridgelines with pulsing valley lights
+</td>
+<td width="50%">
+<a href="prompts/Retro_VHS_CRT_Glitch.md"><img src="screenshots/examples/retro-vhs-crt-glitch.gif" alt="Retro VHS CRT glitch" width="100%"></a>
+<b><a href="prompts/Retro_VHS_CRT_Glitch.md">Retro VHS CRT Glitch</a></b> — scanlines, chroma bleed, tracking tears, and a live timecode OSD
+</td>
+</tr>
+<tr>
+<td width="50%">
+<a href="prompts/Day_For_Night_Grade.md"><img src="screenshots/examples/day-for-night-grade.gif" alt="Day for night grade" width="100%"></a>
+<b><a href="prompts/Day_For_Night_Grade.md">Day For Night Grade</a></b> — moonlit grade that turns daytime footage into convincing night
+</td>
+<td width="50%">
+</td>
+</tr>
+</table>
+
+---
+
 ## Requirements
 
 - macOS (Windows not supported)
