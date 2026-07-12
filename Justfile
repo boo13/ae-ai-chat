@@ -39,7 +39,7 @@ release version:
     fi
 
     if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
-      . "$HOME/.nvm/nvm.sh"
+      . "$HOME/.nvm/nvm.sh" --no-use
       if ! nvm use >/dev/null 2>&1; then
         echo "Installing Node from .nvmrc..."
         nvm install
