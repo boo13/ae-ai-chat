@@ -122,6 +122,23 @@ test("does not block a correctly shaped color or a variable value", () => {
   assert.equal(validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY").length, 0);
 });
 
+test("accepts 2D or 3D arity for dimension-ambiguous transform properties", () => {
+  const script = [
+    'layer.property("ADBE Transform Group").property("ADBE Position").setValue([100, 200]);',
+    'layer.property("ADBE Transform Group").property("ADBE Position").setValue([100, 200, 0]);',
+    'layer.property("ADBE Transform Group").property("ADBE Scale").setValue([50, 50]);',
+    'layer.property("ADBE Transform Group").property("ADBE Anchor Point").setValue([0, 0, 0]);',
+  ].join("\n");
+  assert.equal(validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY").length, 0);
+});
+
+test("still flags a nonsensical arity on an ambiguous transform property", () => {
+  const script = 'layer.property("ADBE Transform Group").property("ADBE Position").setValue([100]);';
+  const errors = validateScript(script).errors.filter((error) => error.code === "SETVALUE_ARITY");
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /expected 2 or 3/);
+});
+
 test("suggests a verified non-effect property matchName typo", () => {
   const warnings = validateScript('layer.property("ADBE Transform Groupp");').warnings.filter(
     (warning) => warning.code === "PROPERTY_MATCHNAME"

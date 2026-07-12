@@ -667,6 +667,14 @@ function literalArrayArity(value: string): number | null {
   return body.split(",").length;
 }
 
+// Position/Anchor Point/Scale share one matchName across 2D layers (2 elements)
+// and 3D layers, cameras, and lights (3), so their arity is genuinely ambiguous.
+const DIMENSION_AMBIGUOUS_MATCHNAMES = new Set([
+  "ADBE Position",
+  "ADBE Anchor Point",
+  "ADBE Scale",
+]);
+
 function checkSetValueArity(content: string): ScriptValidationError[] {
   const errors: ScriptValidationError[] = [];
   const scanText = commentsBlankedView(content);
@@ -676,7 +684,9 @@ function checkSetValueArity(content: string): ScriptValidationError[] {
     const matchName = match[2];
     const detail = PROPERTY_MATCHNAMES[matchName];
     if (!detail) continue;
-    const expected = expectedValueArities(detail.valueType);
+    const expected = DIMENSION_AMBIGUOUS_MATCHNAMES.has(matchName)
+      ? [2, 3]
+      : expectedValueArities(detail.valueType);
     if (!expected) continue;
     const literal = match[3].trim();
     const actual = literal[0] === "[" ? literalArrayArity(literal) : 1;
