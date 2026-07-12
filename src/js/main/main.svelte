@@ -28,6 +28,7 @@
   import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
   import { buildAutoFixPrompt } from "../lib/auto-fix";
   import { getRuntimeEnvironment } from "../lib/runtime-environment";
+  import { installTestHarness } from "../lib/test-harness";
   import type { ExpressionError } from "../lib/auto-fix";
   import type { ErrorKind, TriggerPath } from "../lib/error-log";
   import type {
@@ -882,22 +883,21 @@
     let disposed = false;
     let uninstallTestHarness: (() => void) | null = null;
 
+    // Static (not dynamic) import: CEF cannot fetch a split chunk via import()
+    // at runtime. The __AE_TEST_HARNESS__ define still excludes it from packaged builds.
     if (__AE_TEST_HARNESS__ && runtimeEnvironment.isDevInstall) {
-      import("../lib/test-harness").then(({ installTestHarness }) => {
-        if (disposed) return;
-        uninstallTestHarness = installTestHarness({
-          runPrompt: async (text) => {
-            if (!activeProvider) throw new Error("No provider configured in the panel.");
-            lastActionRunResult = null;
-            lastActionResult = null;
-            await handlePromptSend(text);
-          },
-          getContext: () => buildContext(),
-          getLastActionResult: () => lastActionResult,
-          getLastRunResult: () => lastActionRunResult,
-          getLastError: () => lastError,
-        });
-      }).catch(() => {});
+      uninstallTestHarness = installTestHarness({
+        runPrompt: async (text) => {
+          if (!activeProvider) throw new Error("No provider configured in the panel.");
+          lastActionRunResult = null;
+          lastActionResult = null;
+          await handlePromptSend(text);
+        },
+        getContext: () => buildContext(),
+        getLastActionResult: () => lastActionResult,
+        getLastRunResult: () => lastActionRunResult,
+        getLastError: () => lastError,
+      });
     }
 
     const lastProviderId = localStorage.getItem("selectedProviderId");
