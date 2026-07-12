@@ -131,14 +131,17 @@ Create these layers in top-to-bottom order:
   - Channel Mixer
     - Blue-Green: `50`
     - Blue-Blue: `50`
-  - Lumetri Color
-    - Creative Look: `Cinespace 2383sRGB6bit`
-    - Highlight Tint: `Light Blue/Cyan`
+  - CC Toner
+    - Tones: `Tritone`
+    - Highlights: `[0.92, 0.96, 1.00, 1]`
+    - Midtones: `[0.56, 0.58, 0.53, 1]`
+    - Shadows: `[0.07, 0.10, 0.09, 1]`
+    - Blend w. Original: `0.65` (this slider is a 0-1 fraction in scripting, not a percent)
   - CC Vignette
     - Amount: `50`
   - Levels
-    - Output Black: `2500`
-    - Output White: `30000`
+    - Output Black: `0.076` (Levels channel values are normalized 0-1 in scripting)
+    - Output White: `0.916`
 
 10. LIGHT LEAKS
 - Type: Solid Layer

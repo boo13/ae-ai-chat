@@ -14,3 +14,6 @@ todos
 .env
 .env.local
 offline/
+
+# Videos
+ScreenRecordings/

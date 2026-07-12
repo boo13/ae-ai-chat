@@ -1,10 +1,20 @@
-Build this 5-layer retro VHS and CRT glitch treatment in the active composition. Respond with an AI Action and run it immediately.
+Build this 8-layer retro VHS and CRT glitch treatment in the active composition. Respond with an AI Action and run it immediately.
 
 Use the active `1920x1080` comp, or create a `10`-second, `30` fps comp if none is active; the stack combines scanlines, stepped motion, chroma softness, and horizontal sync distortion without external footage.
 
-Create these new layers in top-to-bottom order, keeping any existing footage below the three adjustment layers and above `VHS SOURCE`:
+Create these new layers in top-to-bottom order, keeping any existing footage below the four adjustment layers, `CRT SCANLINES`, and `TIMECODE OSD`, and above `VHS SOURCE`:
 
-1. FRAME JITTER
+1. OSD PLAY
+- Type: Text Layer
+- Text: `PLAY >`
+- Font: `Courier` (fall back to `Arial-BoldMT` if unavailable)
+- Font Size: `52`
+- TextDocument setup: set Apply Fill to `On`, Fill Color to RGB `[0.92, 0.94, 0.90]`, Justification to `Left`, then reset Anchor Point to `[0, 0]`
+- Transform:
+  - Position: `[120, 150]`
+  - Opacity: `85%`
+
+2. FRAME JITTER
 - Type: Adjustment Layer
 - Blend Mode: Normal
 - Effects in order:
@@ -13,7 +23,14 @@ Create these new layers in top-to-bottom order, keeping any existing footage bel
     - Scale Height: `102`
     - Position expression: `posterizeTime(12); var p = wiggle(8, 4); [p[0], value[1]];`
 
-2. CHROMA BLEED
+3. TRACKING TEAR
+- Type: Adjustment Layer
+- Blend Mode: Normal
+- Effects in order:
+  - Transform
+    - Position expression: `seedRandom(3, false); posterizeTime(24); var r = random(); var off = 0; if (r < 0.05) { off = random(-60, 60); } value + [off, 0];`
+
+4. CHROMA BLEED
 - Type: Adjustment Layer
 - Blend Mode: Normal
 - Effects in order:
@@ -26,7 +43,7 @@ Create these new layers in top-to-bottom order, keeping any existing footage bel
   - Noise
     - Amount of Noise: `7%`
 
-3. SIGNAL WARP
+5. SIGNAL WARP
 - Type: Adjustment Layer
 - Blend Mode: Normal
 - Effects in order:
@@ -40,8 +57,11 @@ Create these new layers in top-to-bottom order, keeping any existing footage bel
     - Antialiasing (Best Quality): `High`
   - Posterize Time
     - Frame Rate: `15`
+  - Optics Compensation
+    - Field Of View: `30`
+    - Reverse Lens Distortion: `On`
 
-4. CRT SCANLINES
+6. CRT SCANLINES
 - Type: Shape Layer
 - Blend Mode: Overlay
 - Transform:
@@ -62,7 +82,22 @@ Create these new layers in top-to-bottom order, keeping any existing footage bel
       - Start Opacity: `100%`
       - End Opacity: `100%`
 
-5. VHS SOURCE
+7. TIMECODE OSD
+- Type: Solid Layer
+- Solid Color: `#000000`
+- Size: full comp
+- Blend Mode: Screen
+- Transform:
+  - Opacity: `80%`
+- Effects in order:
+  - Timecode
+    - Display Format: `SMPTE HH:MM:SS:FF`
+    - Time Units: `30`
+    - Text Position: `[1460, 960]`
+    - Text Size: `46`
+    - Text Color: `[0.92, 0.94, 0.90, 1]`
+
+8. VHS SOURCE
 - Type: Solid Layer
 - Solid Color: `#151728`
 - Size: full comp
@@ -81,3 +116,9 @@ Create these new layers in top-to-bottom order, keeping any existing footage bel
     - Jitter: `3`
   - Noise
     - Amount of Noise: `4%`
+
+Build notes:
+
+- Set each shape/effect property's values immediately after its `addProperty` call; stale sibling references throw "Object is invalid".
+- When easing keyframes, pass one `KeyframeEase` per value dimension; spatial properties (Position, Anchor Point) take exactly one per side (`prop.isSpatial`).
+- ES3 only (`var`, no arrows/template literals), ASCII only, one `app.beginUndoGroup`/`app.endUndoGroup` around all changes.

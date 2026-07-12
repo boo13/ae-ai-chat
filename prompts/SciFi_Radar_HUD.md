@@ -1,4 +1,4 @@
-Build this animated 6-layer sci-fi radar HUD in a new composition. Respond with an AI Action and run it immediately.
+Build this animated 11-layer sci-fi radar HUD with sweep-synced contact blips in a new composition. Respond with an AI Action and run it immediately.
 
 Create a `1920x1080`, `10`-second, `30` fps comp named `SciFi Radar HUD`; radial repeaters, trim-path arcs, a sweeping wedge, and a luminous grid form a complete self-contained interface study.
 
@@ -22,7 +22,22 @@ Create these layers in top-to-bottom order:
     - Glow Intensity: `1.2`
     - Glow Operation: `Add`
 
-2. RADAR SWEEP
+2. DATA READOUT
+- Type: Solid Layer
+- Solid Color: `#000000`
+- Size: full comp
+- Blend Mode: Screen
+- Effects in order:
+  - Numbers
+    - Type: `Number`
+    - Random Values: `On`
+    - Value/Offset/Random Max: `9999`
+    - Decimal Places: `0`
+    - Position: `[1690, 985]`
+    - Fill Color: `[0.18, 0.92, 1.0, 1]`
+    - Size: `26`
+
+3. RADAR SWEEP
 - Type: Shape Layer
 - Blend Mode: Add
 - Transform:
@@ -45,7 +60,55 @@ Create these layers in top-to-bottom order:
     - Glow Intensity: `1.2`
     - Glow Operation: `Add`
 
-3. RADIAL TICKS
+4. BLIP A
+- Type: Shape Layer
+- Blend Mode: Add
+- Transform:
+  - Position: `[1095, 359]`
+  - Opacity expression: `var sweep = (time * 72) % 360; var d = sweep - 40; if (d < 0) d += 360; var o = 100 * Math.exp(-d / 45); Math.max(o, 8);`
+- Contents: one group built with `ADBE Vector Group`
+  - Ellipse Path (`ADBE Vector Shape - Ellipse`): Size `[13, 13]`
+  - Fill (`ADBE Vector Graphic - Fill`): Color `[0.18, 0.92, 1.0, 1]`, Opacity `100%`
+- Effects in order:
+  - Glow: Glow Based On `Alpha Channel`, Glow Threshold `30%`, Glow Radius `15`, Glow Intensity `1.3`, Glow Operation `Add`
+
+5. BLIP B
+- Type: Shape Layer
+- Blend Mode: Add
+- Transform:
+  - Position: `[1174, 700]`
+  - Opacity expression: `var sweep = (time * 72) % 360; var d = sweep - 130; if (d < 0) d += 360; var o = 100 * Math.exp(-d / 45); Math.max(o, 8);`
+- Contents: one group built with `ADBE Vector Group`
+  - Ellipse Path (`ADBE Vector Shape - Ellipse`): Size `[13, 13]`
+  - Fill (`ADBE Vector Graphic - Fill`): Color `[1.0, 0.42, 0.18, 1]`, Opacity `100%`
+- Effects in order:
+  - Glow: Glow Based On `Alpha Channel`, Glow Threshold `30%`, Glow Radius `15`, Glow Intensity `1.3`, Glow Operation `Add`
+
+6. BLIP C
+- Type: Shape Layer
+- Blend Mode: Add
+- Transform:
+  - Position: `[864, 635]`
+  - Opacity expression: `var sweep = (time * 72) % 360; var d = sweep - 220; if (d < 0) d += 360; var o = 100 * Math.exp(-d / 45); Math.max(o, 8);`
+- Contents: one group built with `ADBE Vector Group`
+  - Ellipse Path (`ADBE Vector Shape - Ellipse`): Size `[13, 13]`
+  - Fill (`ADBE Vector Graphic - Fill`): Color `[0.18, 0.92, 1.0, 1]`, Opacity `100%`
+- Effects in order:
+  - Glow: Glow Based On `Alpha Channel`, Glow Threshold `30%`, Glow Radius `15`, Glow Intensity `1.3`, Glow Operation `Add`
+
+7. BLIP D
+- Type: Shape Layer
+- Blend Mode: Add
+- Transform:
+  - Position: `[714, 348]`
+  - Opacity expression: `var sweep = (time * 72) % 360; var d = sweep - 305; if (d < 0) d += 360; var o = 100 * Math.exp(-d / 45); Math.max(o, 8);`
+- Contents: one group built with `ADBE Vector Group`
+  - Ellipse Path (`ADBE Vector Shape - Ellipse`): Size `[13, 13]`
+  - Fill (`ADBE Vector Graphic - Fill`): Color `[0.18, 0.92, 1.0, 1]`, Opacity `100%`
+- Effects in order:
+  - Glow: Glow Based On `Alpha Channel`, Glow Threshold `30%`, Glow Radius `15`, Glow Intensity `1.3`, Glow Operation `Add`
+
+8. RADIAL TICKS
 - Type: Shape Layer
 - Blend Mode: Add
 - Transform:
@@ -74,7 +137,7 @@ Create these layers in top-to-bottom order:
     - Glow Intensity: `1.1`
     - Glow Operation: `Add`
 
-4. RADAR RINGS
+9. RADAR RINGS
 - Type: Shape Layer
 - Blend Mode: Add
 - Transform:
@@ -93,13 +156,13 @@ Create these layers in top-to-bottom order:
     - Glow Intensity: `1.0`
     - Glow Operation: `Add`
 
-5. HUD GRID
+10. HUD GRID
 - Type: Solid Layer
 - Solid Color: `#000000`
 - Size: full comp
 - Blend Mode: Screen
 - Transform:
-  - Opacity: `24%`
+  - Opacity: `18%`
 - Effects in order:
   - Grid
     - Anchor: `[960, 540]`
@@ -117,7 +180,7 @@ Create these layers in top-to-bottom order:
     - Glow Intensity: `0.8`
     - Glow Operation: `Add`
 
-6. HUD BACKGROUND
+11. HUD BACKGROUND
 - Type: Solid Layer
 - Solid Color: `#02070D`
 - Size: full comp
@@ -132,3 +195,9 @@ Create these layers in top-to-bottom order:
     - Ramp Scatter: `3`
   - Noise
     - Amount of Noise: `2%`
+
+Build notes:
+
+- Set each shape/effect property's values immediately after its `addProperty` call; stale sibling references throw "Object is invalid".
+- When easing keyframes, pass one `KeyframeEase` per value dimension; spatial properties (Position, Anchor Point) take exactly one per side (`prop.isSpatial`).
+- ES3 only (`var`, no arrows/template literals), ASCII only, one `app.beginUndoGroup`/`app.endUndoGroup` around all changes.

@@ -52,6 +52,11 @@ export const VALIDATOR_REJECTIONS: Array<{ code: string; description: string }> 
     code: "SETVALUE_ARITY",
     description: "literal setValue() shape does not match the verified property valueType",
   },
+  {
+    code: "SETVALUE_RANGE",
+    description:
+      'literal setValue() outside a verified 0-1 range — some percent-styled sliders (e.g. CC Toner "Blend w. Original") take fractions: write 65% as 0.65',
+  },
 ];
 
 // ExtendScript globals the model commonly misspells. The bad form is always a
@@ -738,6 +743,57 @@ function checkSetValueArity(content: string): ScriptValidationError[] {
   return errors;
 }
 
+// UI shows these as percents (or bit-depth values), but the scripting value is
+// a normalized fraction — setValue(65) on CC Toner-0004 throws "Value 65 out of
+// range 0 to 1" at runtime and aborts the script. `limit` is generous so
+// legitimate over-range values (32-bpc HDR levels) still pass.
+const FRACTION_RANGE_PROPS: Record<string, { label: string; limit: number; hint: string }> = {
+  "CC Toner-0004": {
+    label: 'CC Toner "Blend w. Original"',
+    limit: 1,
+    hint: "the UI shows a percent — write 65% as setValue(0.65)",
+  },
+  "ADBE Easy Levels2-0003": {
+    label: 'Levels "Input Black"',
+    limit: 8,
+    hint: "divide 8-bpc UI values by 255, 16-bpc by 32768 (e.g. 30000 -> 0.916)",
+  },
+  "ADBE Easy Levels2-0004": {
+    label: 'Levels "Input White"',
+    limit: 8,
+    hint: "divide 8-bpc UI values by 255, 16-bpc by 32768 (e.g. 30000 -> 0.916)",
+  },
+  "ADBE Easy Levels2-0006": {
+    label: 'Levels "Output Black"',
+    limit: 8,
+    hint: "divide 8-bpc UI values by 255, 16-bpc by 32768 (e.g. 30000 -> 0.916)",
+  },
+  "ADBE Easy Levels2-0007": {
+    label: 'Levels "Output White"',
+    limit: 8,
+    hint: "divide 8-bpc UI values by 255, 16-bpc by 32768 (e.g. 30000 -> 0.916)",
+  },
+};
+
+function checkSetValueRange(content: string): ScriptValidationError[] {
+  const errors: ScriptValidationError[] = [];
+  const scanText = commentsBlankedView(content);
+  const re = /\.property\(\s*(['"])([^'"]+)\1\s*\)\s*\.setValue\(\s*(-?\d+(?:\.\d+)?)\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(scanText)) !== null) {
+    const spec = FRACTION_RANGE_PROPS[match[2]];
+    if (!spec) continue;
+    const value = Number(match[3]);
+    if (Math.abs(value) <= spec.limit) continue;
+    errors.push({
+      code: "SETVALUE_RANGE",
+      message: `${spec.label} (${match[2]}) takes a normalized 0-1 fraction; setValue(${match[3]}) throws or produces garbage — ${spec.hint}.`,
+      occurrences: [getLineColumn(content, match.index)],
+    });
+  }
+  return errors;
+}
+
 export function validateScript(content: string): ScriptValidationResult {
   const codeOnly = codeOnlyView(content);
 
@@ -748,6 +804,7 @@ export function validateScript(content: string): ScriptValidationResult {
     ...checkInvalidGlobals(codeOnly),
     ...checkUndoGroupBalance(codeOnly),
     ...checkSetValueArity(content),
+    ...checkSetValueRange(content),
   ];
 
   const warnings: ScriptValidationWarning[] = [

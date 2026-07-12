@@ -1,8 +1,8 @@
-Build this 5-layer day-for-night cinematic grade over the active composition. Respond with an AI Action and run it immediately.
+Build this 6-layer day-for-night cinematic grade over the active composition. Respond with an AI Action and run it immediately.
 
 Use the active `1920x1080` comp, or create a `10`-second, `30` fps comp if none is active; the stack compresses daylight, cools highlights, adds moon haze, and remains visible even when the starting comp is empty.
 
-Create these new layers in top-to-bottom order, leaving any existing footage below `MOON HAZE` and above `NIGHT SKY BASE`:
+Create these new layers in top-to-bottom order, leaving any existing footage below `CLOUD SHADOWS` and `MOON HAZE`, and above `NIGHT SKY BASE`:
 
 1. NIGHT VIGNETTE
 - Type: Adjustment Layer
@@ -46,13 +46,35 @@ Create these new layers in top-to-bottom order, leaving any existing footage bel
     - Output Black: `0.015`
     - Output White: `0.82`
 
-4. MOON HAZE
+4. CLOUD SHADOWS
+- Type: Solid Layer
+- Solid Color: `#000000`
+- Size: full comp
+- Blend Mode: Multiply
+- Transform:
+  - Opacity: `14%`
+- Effects in order:
+  - Fractal Noise
+    - Fractal Type: `Cloudy`
+    - Contrast: `120`
+    - Brightness: `10`
+    - Uniform Scaling: `Off`
+    - Scale Width: `1600`
+    - Scale Height: `700`
+    - Complexity: `2`
+    - Offset Turbulence expression: `var p = value; [p[0] + time * 25, p[1]];`
+    - Evolution expression: `time * 3`
+  - Gaussian Blur
+    - Blurriness: `40`
+    - Repeat Edge Pixels: `On`
+
+5. MOON HAZE
 - Type: Solid Layer
 - Solid Color: `#000000`
 - Size: full comp
 - Blend Mode: Screen
 - Transform:
-  - Opacity: `32%`
+  - Opacity expression: `var o = 30 + 4 * Math.sin(time * 0.5); o;`
 - Effects in order:
   - Gradient Ramp
     - Start of Ramp: `[1500, 180]`
@@ -65,7 +87,7 @@ Create these new layers in top-to-bottom order, leaving any existing footage bel
     - Blurriness: `85`
     - Repeat Edge Pixels: `On`
 
-5. NIGHT SKY BASE
+6. NIGHT SKY BASE
 - Type: Solid Layer
 - Solid Color: `#061020`
 - Size: full comp
@@ -79,3 +101,9 @@ Create these new layers in top-to-bottom order, leaving any existing footage bel
     - End Color: `[0.004, 0.010, 0.025, 1]`
     - Ramp Shape: `Linear Ramp`
     - Ramp Scatter: `3`
+
+Build notes:
+
+- Set each shape/effect property's values immediately after its `addProperty` call; stale sibling references throw "Object is invalid".
+- When easing keyframes, pass one `KeyframeEase` per value dimension; spatial properties (Position, Anchor Point) take exactly one per side (`prop.isSpatial`).
+- ES3 only (`var`, no arrows/template literals), ASCII only, one `app.beginUndoGroup`/`app.endUndoGroup` around all changes.
