@@ -8,7 +8,8 @@ export interface RuntimeEnvironment {
 }
 
 function normalizePath(value: string): string {
-  return decodeURI(value).replace(/\\/g, "/");
+  // getSystemPath returns a file:// URL on macOS; fs needs a plain path.
+  return decodeURI(value).replace(/^file:\/\//, "").replace(/\\/g, "/");
 }
 
 function getExtensionPath(): string {
