@@ -2,7 +2,7 @@
   "plansDirectory": ".claude/plans",
   "permissions": {
     "allow": [
-      "Bash(codex exec --full-auto:*)",
+      "Bash(codex exec:*)",
       "Bash(git status)",
       "Bash(git log *)",
       "Bash(git diff *)",
