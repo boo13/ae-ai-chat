@@ -41,7 +41,7 @@ Do not add a general-purpose shell-to-ExtendScript bridge to the packaged produc
 | Idea | Why it helps | Adaptation for this project |
 |---|---|---|
 | Inspect → act → verify loop | Complex AE work benefits from runtime feedback instead of one-shot confidence | Let the panel send post-run evidence and an optional preview back to the same provider session |
-| Small observable steps | Limits blast radius in a stateful professional app | Permit one automatic mutation per user turn; stage any corrective mutation for approval |
+| Small observable steps | Limits blast radius in a stateful professional app | In verified mode, permit one controller-managed execution attempt per user turn; stage every later action for approval |
 | Structured shell/tool results | Makes failures and evidence easier for agents to consume | Define typed internal action/evidence objects and a versioned provider protocol |
 | Runtime introspection over pretraining | AE APIs and versions are inconsistent | Keep the detailed snapshot authoritative and add bounded read-only probes only when a concrete gap is demonstrated |
 | Broad scripting API index | Current corpus is deep for effects, properties, expressions, and recipes but not the entire scripting DOM | Generate message-matched `[DOCS]` records from a pinned docsforadobe source; never override verified effect data |
@@ -61,13 +61,13 @@ Do not add a general-purpose shell-to-ExtendScript bridge to the packaged produc
 
 ### Existing foundations to preserve
 
-- `src/js/lib/context.ts:568-788`: byte-stable static context, dynamic snapshot context, pinned data, untrusted-data boundary, present-effect records, and last-action evidence.
-- `src/js/lib/knowledge/index.ts:20-146`: static and message-matched knowledge composition.
-- `src/js/lib/knowledge/validator.ts:32-460`: ES3, match-name, value-shape, enum, and range validation.
-- `src/js/lib/security.ts:49-75`: side-effect risk classification.
-- `src/js/lib/ai-action.ts:290-502`: action parsing, preparation, ephemeral persistence, and execution.
-- `src/jsx/aeft/aeft.ts:1564-1692`: bounded before/after snapshots, expression evidence, and runtime errors.
-- `src/shared/run-diff.ts:15-143`: deterministic state-diff generation.
+- `buildContext` and `getStaticContext` in `src/js/lib/context.ts`: byte-stable static context, dynamic snapshot context, pinned data, untrusted-data boundary, present-effect records, and last-action evidence.
+- `getStaticKnowledgeContext` and `getMessageKnowledgeContext` in `src/js/lib/knowledge/index.ts`: static and message-matched knowledge composition.
+- `validateScript` in `src/js/lib/knowledge/validator.ts`: ES3, match-name, value-shape, enum, and range validation.
+- `scanActionRisk` in `src/js/lib/security.ts`: side-effect risk classification.
+- `parseAiAction`, `saveAiAction`, and `runAiAction` in `src/js/lib/ai-action.ts`: action parsing, preparation, ephemeral persistence, and execution.
+- `runScriptFile` and `saveFrameToPng` in `src/jsx/aeft/aeft.ts`: bounded before/after snapshots, expression evidence, runtime errors, and frame capture.
+- `diffRunSnapshots` in `src/shared/run-diff.ts`: deterministic state-diff generation.
 - `scripts/ae-driver.mjs`: live dev-panel CDP primitives.
 - `scripts/verify-recipes.mjs`, `scripts/verify-e2e.mjs`, and `.claude/skills/verify-loop/`: live AE verification and promotion workflow.
 
@@ -88,7 +88,7 @@ Do not add a general-purpose shell-to-ExtendScript bridge to the packaged produc
 - Replacing CEP, `evalTS`, or the current provider implementations.
 - Shipping a generic local HTTP `evalScript` service.
 - Allowing autonomous saving, rendering, exporting, relinking, closing, or quitting.
-- Automatically making multiple successful mutations in one user turn.
+- In verified mode, automatically making more than one execution attempt in one user turn, whether or not the first attempt produced an observed diff.
 - Persisting unfinished agent turns across panel or AE restarts in the first release.
 - Treating a non-empty state diff as proof of visual correctness.
 - Importing Flue as a runtime or development dependency.
@@ -126,10 +126,11 @@ flowchart TD
 |---|---|---|
 | Mutation primitive | Preserve `<ai-action>` | Maintains compatibility and reuses the strongest existing path |
 | Completion signal | Add explicit `<ai-complete>...</ai-complete>` during iterative turns | Avoids heuristic loop completion while allowing legacy plain-text final responses outside verified mode |
-| Automatic mutation cap | One per user turn | Keeps undo and partial-failure behavior understandable |
-| Validation repairs | Up to two provider repairs before execution | These cannot mutate AE and are safe to automate |
+| Verified-turn execution cap | One controller-managed execution attempt per verified turn, consumed immediately before execution | Empty diffs and thrown errors cannot accidentally authorize a second mutation |
+| Pre-execution repairs | Two total, shared by validation failures and malformed protocol | These cannot mutate AE and are safe to automate; one evidence call remains reserved |
 | Corrective mutation | Save with `run=false` after the first mutation | User sees evidence and approves another state change explicitly |
-| Loop cap | Three provider calls and ten minutes total | Bounds cost, latency, and stuck sessions |
+| Loop cap | Four provider calls: initial + two repair slots + one reserved evidence continuation | The evidence continuation cannot be displaced by repair attempts |
+| Active-time cap | Ten minutes excluding `awaiting_approval` | Bounds model/processing time without expiring while the user reviews a script |
 | Preview cap | One frame per turn | Prevents render churn and temp-file accumulation |
 | Provider protocol | Product-controlled textual protocol first | Works across API and CLI providers without provider-specific tool implementations |
 | Native API tools | Defer until the common protocol is proven | Avoids divergent behavior between providers |
@@ -138,7 +139,9 @@ flowchart TD
 
 ## Typed contracts
 
-Add panel-side contracts in `src/js/lib/agent-turn-types.ts`:
+Add serializable evidence DTOs to `src/shared/agent-evidence.ts`. Move `ExpressionError` there from `src/js/lib/auto-fix.ts`, and import it from the shared module in `auto-fix.ts`, `error-log.ts`, `main.svelte`, and the executor. Export `RunStateDiff = ReturnType<typeof diffRunSnapshots>` from `src/shared/run-diff.ts`; `ActionEvidence.stateDiff` must use that type instead of inventing another representation. Keep validator-native `ScriptValidationError` and `ScriptValidationWarning` inside the executor, mapping them to shared `EvidenceValidationIssue` DTOs at the boundary so shared code does not import panel knowledge modules.
+
+Add panel-side turn contracts in `src/js/lib/agent-turn-types.ts`:
 
 ```ts
 export type AgentTurnPhase =
@@ -149,31 +152,39 @@ export type AgentTurnPhase =
   | "running_action"
   | "capturing_preview"
   | "verifying"
+  | "verification_interrupted"
   | "completed"
   | "cancelled"
   | "failed";
 
 export interface AgentTurnLimits {
   maxProviderCalls: number;
-  maxValidationRepairs: number;
-  maxAutomaticMutations: number;
+  maxPreExecutionRepairs: number;
+  maxExecutionAttempts: number;
   maxPreviews: number;
-  deadlineMs: number;
+  activeDeadlineMs: number;
 }
 
 export interface ActionEvidence {
   attempt: number;
   ran: boolean;
   status: "blocked" | "failed" | "inconclusive" | "succeeded";
-  validationErrors: ScriptValidationError[];
-  validationWarnings: ScriptValidationWarning[];
+  validationErrors: EvidenceValidationIssue[];
+  validationWarnings: EvidenceValidationIssue[];
   riskReasons: string[];
   runtimeError?: string;
   errorLine?: number | null;
   expressionErrors: ExpressionError[];
   expressionsSet: Array<{ name: string; layer?: string }>;
-  stateDiff: string[];
+  stateDiff: RunStateDiff;
   previewPath?: string;
+  previewUnavailableReason?:
+    | "no_active_comp"
+    | "unsupported_provider"
+    | "capture_timeout"
+    | "capture_failed"
+    | "resize_failed"
+    | "oversized";
 }
 
 export interface AgentTurnState {
@@ -181,17 +192,42 @@ export interface AgentTurnState {
   objective: string;
   phase: AgentTurnPhase;
   providerCalls: number;
-  validationRepairs: number;
-  automaticMutations: number;
+  preExecutionRepairs: number;
+  executionAttempts: number;
   previews: number;
   startedAt: number;
-  deadlineAt: number;
+  activeDeadlineAt: number;
+  remainingActiveMs: number;
+  pausedAt?: number;
   evidence: ActionEvidence[];
   pendingCorrection?: string;
 }
 ```
 
-Keep display messages separate from the provider transcript. Intermediate action proposals and evidence must be available to the model without appearing as ordinary user-authored chat messages.
+Use these exact defaults in verified mode:
+
+```ts
+const VERIFIED_TURN_LIMITS: AgentTurnLimits = {
+  maxProviderCalls: 4,
+  maxPreExecutionRepairs: 2,
+  maxExecutionAttempts: 1,
+  maxPreviews: 1,
+  activeDeadlineMs: 600_000,
+};
+```
+
+Call accounting is deterministic:
+
+- Call 1 is the initial response.
+- Calls 2 and 3 are the only possible pre-execution repair calls. Validation failures and malformed protocol share `preExecutionRepairs`; each repair request increments both counters before sending.
+- One slot is always reserved for the first execution attempt's evidence continuation. Evidence is the next actual call—call 2, 3, or 4 depending on repair count—and repair logic must stop when `providerCalls === maxProviderCalls - 1`.
+- If two repairs do not produce a valid action, fail before mutation. If the evidence continuation fails or returns malformed protocol, terminate as `verification_interrupted` while retaining the execution evidence; do not make another call.
+- Unused repair slots never become extra post-execution calls.
+- A transport/provider error or active-time timeout consumes the call already started but never consumes `preExecutionRepairs` and is not retried automatically. Before execution it terminates as `failed`; after execution it terminates as `verification_interrupted`.
+
+The ten-minute deadline measures active controller time. On entry to `awaiting_approval`, compute `remainingActiveMs = max(0, activeDeadlineAt - now)`, set `pausedAt`, and stop the deadline timer. Manual run resumes with `activeDeadlineAt = now + remainingActiveMs`; it does not receive a fresh ten minutes. Waiting for approval has no wall-clock timeout during the current panel session, but provider switch, verification-setting change, panel unload, or explicit cancellation clears it.
+
+Mutation accounting is also deterministic. `AgentTurnController.claimExecutionSlot(turnId)` atomically checks and increments `executionAttempts`; both the controller's safe auto-run path and `main.svelte`'s matching manual-approval path must call it immediately before `executePreparedAction`. Every controller-managed execution attempt consumes the single budget even if it throws, reports expression errors, or produces an empty diff. Every later action in that verified turn is persisted with `run=false` and ends the loop in a staged-correction state. If the active-time budget is already zero before entering `awaiting_approval`, fail instead of pausing; otherwise pause and preserve the exact positive remainder.
 
 ## Provider response protocol
 
@@ -217,14 +253,58 @@ The requested change is complete. Runtime evidence showed ...
 
 Rules:
 
-- Continue honoring existing `<ai-action run="true|false">` responses.
+- Legacy mode continues honoring the first `<ai-action run="true|false">` exactly as today; the stricter rules below apply only in verified mode.
 - Default `verify` to `state` in verified mode and `none` in legacy mode.
-- Accept only the first action and first completion block.
-- Reject a response containing both an executable action and completion.
-- Treat malformed protocol as a provider error with one repair opportunity.
-- After an action ran, any subsequent action is forced to `run=false` regardless of model output.
-- A plain-text response after evidence is treated as a legacy completion but logged as a protocol fallback.
+- Before scanning, mask triple-backtick and triple-tilde fenced code regions. Protocol-looking tags inside fences are inert quoted examples, not commands.
+- In verified mode, a tag-bearing response may contain exactly one top-level `<ai-action>` or exactly one top-level `<ai-complete>`. Duplicate blocks, nested blocks, unclosed tags, unsupported `verify` values, and any response containing both action and completion are malformed.
+- Before execution, malformed protocol consumes one of the same two `preExecutionRepairs` used by validation failures. There is no separate protocol-repair budget.
+- After execution, a malformed evidence response terminates as `verification_interrupted`; the call cap forbids another repair call.
+- After any execution attempt, any subsequent action is forced to `run=false` regardless of model output or observed diff.
+- A tag-free plain-text response on call 1 completes an answer-only turn. A tag-free plain-text response after evidence is treated as a legacy completion but logged as a protocol fallback.
+- During a pre-execution repair phase, tag-free or empty output is malformed and can trigger only the next remaining shared repair slot. An empty response in any other phase is malformed.
 - Never expose raw action/evidence protocol tags in the rendered chat.
+
+### Model-facing protocol text
+
+Author the verified-mode instructions in `STATIC_PRELUDE`/`getStaticContext` in `src/js/lib/context.ts`; this is a required Phase 2 deliverable, not provider-specific prompt text. Set `AGENT_PROTOCOL_VERSION = "verified-v1"` and `LEGACY_PROTOCOL_VERSION = "legacy-v1"`. Cache static context by protocol version, not in the current single global cache slot. Use two byte-stable prelude variants selected by verification mode:
+
+- Legacy prelude: preserve the current action protocol byte-for-byte except for an explicit protocol-version identifier.
+- Verified prelude: define `<ai-action>`, `run`, `verify="state|visual"`, `<ai-complete>`, evidence status meanings, the one-execution-attempt rule, and the requirement that every post-evidence correction use `run="false"`.
+- Tell the model that it has no authorized shell, MCP, skill, or alternate Adobe bridge and must express every AE mutation through one top-level `<ai-action>`.
+- Tell the model that `succeeded` means tracked state changed without a reported runtime/expression error, `inconclusive` means the bounded diff was empty, and `failed` can still include partial changes.
+- Require an answer-only turn to return plain text or one `<ai-complete>`, and an action turn to return one action without claiming completion in the same response.
+
+Use this normative verified-mode stanza verbatim apart from normal line wrapping:
+
+```text
+## Iterative AI Action Protocol (verified-v1)
+
+For an answer that does not modify After Effects, return plain text or exactly one
+<ai-complete>...</ai-complete> block.
+
+For an After Effects mutation, return exactly one top-level block:
+<ai-action run="true" verify="state">ES3 ExtendScript</ai-action>
+or request a preview with verify="visual". Use run="false" when the action must be
+reviewed before execution. Never return an action and <ai-complete> together.
+
+The panel is the only authority allowed to execute After Effects mutations. You have
+no authorized shell, MCP server, skill, or alternate Adobe bridge. Every mutation must
+use the single <ai-action> block and will pass panel validation and risk checks.
+
+The panel permits one execution attempt in this verified turn. An attempt consumes the
+budget even when it errors or the bounded state diff is empty. After any action evidence,
+either return exactly one <ai-complete> block or exactly one corrective
+<ai-action run="false"> block for user review. Never request an automatic second run.
+
+Evidence status "succeeded" means tracked state changed with no reported runtime or
+expression error. "inconclusive" means the bounded diff was empty and is not proof that
+nothing changed. "failed" may still include partial changes. Base completion claims only
+on the supplied evidence and fresh AE context.
+```
+
+The legacy variant adds only `## AI Action Protocol (legacy-v1)` ahead of the existing action-protocol text; all remaining legacy instructions stay byte-for-byte unchanged.
+
+Build the session fingerprint from `provider id + model + verification mode + selected protocol version`. Changing the verification toggle, model, provider, or protocol version cancels the active turn, clears the controller transcript, and sets the provider `sessionId` to `undefined`. This is mandatory because resumed CLI sessions receive static context only on their first call.
 
 ## Evidence packet
 
@@ -252,6 +332,36 @@ Decide whether the user's objective is satisfied. If it is, return one
 
 Important trust rule: status labels and counts are panel-authored, but layer names, effect names, expression text, error strings, and state-diff descriptions can contain project-derived data. Pass those strings through the existing untrusted-context defanging and boundary.
 
+### Evidence-message mechanics
+
+`AgentTurnController` owns a `ProviderMessage[]` transcript independent of rendered `ChatMessage[]`. Change the provider contract from `(prompt, options, history: ChatMessage[])` to one `ProviderTurnInput` containing `message`, `priorTranscript`, and `options`; the UI continues to own display messages. `message` is the current user-role input and `priorTranscript` contains only previously accepted user/assistant pairs. After a successful call, append that current message and the provider response to the controller transcript. Evidence is the next panel-authored user-role `message`, never a `system` or rendered user message.
+
+Add these contracts to `src/js/lib/providers/provider.ts`:
+
+```ts
+export interface ProviderMessage {
+  role: "user" | "assistant";
+  text: string;
+  imagePath?: string;
+  origin: "user" | "provider" | "panel_control" | "panel_evidence";
+}
+
+export interface ProviderTurnInput {
+  message: ProviderMessage & { role: "user" };
+  priorTranscript: ProviderMessage[];
+  options: SendMessageOptions;
+}
+```
+
+Use `origin: "user"` for the initial prompt, `"panel_control"` for validation/protocol repair requests, `"panel_evidence"` for post-run evidence, and `"provider"` for assistant responses.
+
+For every continuation, call `buildContext` again and pass its new `systemContext` separately from the transcript:
+
+- Claude API rebuilds the API `system` field from byte-stable `staticContext` plus current `systemContext`; that system field precedes the conversation semantically. It then sends `priorTranscript` followed by `message`. The evidence text and optional preview image are content blocks in that same current user message.
+- Claude CLI and Codex keep their provider-native session IDs. The controller records the transcript for traceability but the provider sends only the current message on resume. Its prompt is `systemContext + "\n\n" + message.text`; it omits `staticContext` because the native session already contains it.
+- Codex visual continuation uses `codex exec resume -i <preview-path> ...`. Provider capability startup checks the installed `codex exec resume --help` output once and records the detected version/capability in diagnostics.
+- A provider switch or session-fingerprint change discards both native session ID and controller transcript; they must never drift independently.
+
 ## User flows
 
 ### Flow 1: Answer-only request
@@ -273,36 +383,36 @@ Acceptance: no action file, preview, or extra provider call is created.
 6. Provider explicitly completes.
 7. UI reports the action and evidence once, without duplicate assistant messages.
 
-Acceptance: exactly one mutation and at most two provider calls.
+Acceptance: exactly one execution attempt and at most two provider calls when the first action is valid.
 
 ### Flow 3: Validation failure before execution
 
 1. Validator blocks the proposed script.
 2. Nothing is written to AE.
 3. Controller returns structured validation errors and relevant script lines.
-4. Provider may repair twice within the overall call cap.
+4. After each blocked response, controller requests a repair while `preExecutionRepairs < 2`; calls 2 and 3 are the only repair calls, and protocol and validation failures consume the same counter.
 5. The first valid safe action runs normally.
 
-Acceptance: validation repair never consumes the mutation budget and never creates an undo entry.
+Acceptance: pre-execution repair never consumes the execution budget or creates an undo entry, and call 4 remains available for evidence.
 
 ### Flow 4: Warning or risky action
 
 1. Validator warning or `scanActionRisk` result blocks automatic execution.
 2. Panel saves the action, opens the normal review affordance, and moves the turn to `awaiting_approval`.
-3. User can inspect, run, ask for a safer alternative, or cancel.
-4. If the user runs it, the same controller receives the evidence and resumes verification.
+3. User can inspect, run, or cancel. Asking for a different action cancels this pending turn and starts a new user turn.
+4. If the user runs it, `main.svelte` calls the same executor, then passes normalized evidence to `activeAgentTurn.resumeAfterApprovedAction(evidence)`.
 5. If the user cancels, no provider continuation occurs.
 
-Acceptance: approval state survives normal UI interaction for the current panel session but is cleared on provider switch or panel unload.
+Acceptance: approval state and its remaining active-time budget survive normal UI interaction for the current panel session; the active deadline is paused until run/cancel and the state is cleared on provider/model/toggle change or panel unload.
 
 ### Flow 5: Runtime or expression failure
 
 1. Executor records the error, error line, expression errors, and state diff.
-2. If no mutation occurred, controller may request a staged repair.
-3. If any tracked state changed, controller must not auto-run another script.
-4. Panel explains that the action partially changed AE and offers explicit recovery choices: keep changes, undo manually and retry, inspect the staged fix, or stop.
+2. The execution attempt has already consumed the sole verified-turn execution budget, regardless of whether the diff is empty.
+3. Controller sends that evidence through the single reserved continuation and accepts only completion or a staged `run=false` correction; it never auto-runs another script.
+4. If tracked state changed, the panel explains that the action partially changed AE and offers explicit recovery choices: keep changes, undo manually and start a new turn, inspect the staged fix, or stop.
 
-Acceptance: a partial failure can never silently produce a second automatic mutation.
+Acceptance: neither a partial failure nor an observed no-op can produce a second controller-managed execution attempt.
 
 ### Flow 6: Empty state diff
 
@@ -316,17 +426,18 @@ Acceptance: existing “empty diff is inconclusive” semantics remain intact.
 ### Flow 7: Visual verification
 
 1. Action requests `verify="visual"` and the active provider supports images.
-2. Panel saves one frame at the playhead to `.session/previews/<turn-id>.png`.
-3. CEP Node polls for a valid PNG `IEND` trailer before attachment.
-4. Preview is attached to the evidence continuation.
-5. Provider completes or stages a correction.
-6. Preview is deleted after the turn or on panel unload.
+2. If no active comp exists, record `previewUnavailableReason: "no_active_comp"` and continue with state evidence.
+3. Otherwise the panel saves a raw frame at the playhead, waits for a valid PNG `IEND`, then uses the macOS system `sips` command with fixed panel-controlled arguments to downscale the longest edge to at most 2,048 pixels.
+4. Validate the downscaled PNG again and attach it only if its final file size is at most 8 MiB; otherwise record `previewUnavailableReason: "oversized"` and continue state-only.
+5. Preview is attached to the evidence continuation.
+6. Provider completes or stages a correction.
+7. Raw and downscaled previews are deleted after the turn or on panel unload.
 
-Fallback: Claude CLI receives state evidence only and the final response says visual verification was unavailable.
+Fallback: Claude CLI, missing active comp, capture/resize failure, timeout, and an oversized final PNG all use state evidence and include the precise panel-authored unavailability reason. Preview failure never fails the action turn.
 
 ### Flow 8: Cancellation or provider failure after mutation
 
-1. User cancels or the second provider call fails after an action ran.
+1. User cancels or the evidence continuation fails after an action ran.
 2. Controller stops all further calls and mutations.
 3. Panel retains and displays the action evidence already obtained.
 4. Final status distinguishes “action failed” from “action ran; verification was interrupted.”
@@ -350,17 +461,23 @@ Estimated effort: medium. No user-facing behavior change.
 #### Tasks
 
 - Record baseline results for `pnpm test`, `pnpm typecheck`, `pnpm recipes:check`, `pnpm recipes:verify --all`, and `pnpm verify:e2e`.
-- Add an ADR section to this plan or a small `docs/architecture/agent-loop.md` documenting the one-auto-mutation rule and provider boundary.
+- Add `docs/architecture/agent-loop.md` documenting the provider boundary, call reservation, active-time pause, execution-attempt mutation accounting, transcript ownership, and legacy/verified policy split.
 - Extract pure CLI-argument builders from:
   - `src/js/lib/providers/claude.ts`
   - `src/js/lib/providers/codex.ts`
-- Add tests proving the panel providers cannot auto-load external skills or mutate the workspace out of band.
+- Add pure argument-builder tests and a live `scripts/verify-provider-isolation.mjs` canary procedure. The live script must:
+  1. Abort if either unique canary directory already exists.
+  2. Temporarily create `$HOME/.claude/skills/ae-ai-chat-isolation-canary/SKILL.md` and `$HOME/.agents/skills/ae-ai-chat-isolation-canary/SKILL.md` with an exact trigger phrase, an instruction to emit `AE_AI_CHAT_ISOLATION_CANARY_INVOKED`, and an attempted marker-file write.
+  3. Launch each configured provider through the production argument builder with the exact trigger fixture.
+  4. Assert that neither the sentinel nor marker file appears and that provider diagnostics report isolation enabled.
+  5. Remove both canary directories and the marker in a `finally` block.
+- Add `"provider:isolation:live": "node scripts/verify-provider-isolation.mjs"` to `package.json`; run `pnpm provider:isolation:live -- --provider claude` and `pnpm provider:isolation:live -- --provider codex` as explicit live checks.
 - Spike and verify these current CLI controls:
   - Claude: `--safe-mode`, `--disable-slash-commands`, `--tools ""`, and removal of `--dangerously-skip-permissions`.
   - Codex: temporary working directory, `--sandbox read-only`, `--ignore-user-config`, `--ignore-rules`, and `--skip-git-repo-check`.
 - Preserve authentication, model selection, streaming, session resume, cancellation, and image attachment.
 - Add launch diagnostics indicating whether provider isolation is active.
-- If a CLI version cannot provide the required isolation, disable iterative mode for that provider and retain current one-shot behavior with a visible reason.
+- If a CLI version cannot provide the required isolation, mark that CLI provider unavailable with a visible reason. Isolation failure must not fall back to a less-restricted one-shot launch.
 
 #### Files
 
@@ -368,12 +485,15 @@ Estimated effort: medium. No user-facing behavior change.
 - `src/js/lib/providers/codex.ts`
 - `src/js/lib/providers/provider.ts`
 - `tests/provider-isolation.test.ts`
+- `scripts/verify-provider-isolation.mjs`
 - `scripts/run-unit-tests.mjs`
+- `package.json`
+- `docs/architecture/agent-loop.md`
 
 #### Exit criteria
 
 - Existing provider smoke tests still stream and resume.
-- Claude/Codex launched by the panel cannot discover or invoke a globally installed Flue/Adobe skill during a fixture prompt.
+- Unit tests prove every required isolation argument, and both live canary commands complete without the sentinel or marker appearing.
 - No provider requires write access to the project repository for normal panel operation.
 
 ### Phase 1: Extract the validated action executor
@@ -383,22 +503,28 @@ Estimated effort: medium-high. Structural refactor with behavior parity.
 #### Tasks
 
 - Move action orchestration out of `src/js/main/main.svelte` into `src/js/lib/action-executor.ts`.
-- Expose two pure entry points:
+- Expose two entry points:
   - `prepareAction(script, context)` → validation, warnings, risk, saved metadata.
   - `executePreparedAction(action)` → runtime result, expression evidence, state diff.
 - Centralize result normalization currently duplicated between automatic and manual runs.
 - Inject logging callbacks so the executor does not own UI state.
-- Keep `saveAiAction`, `prepareRunnableScript`, and `runAiAction` as lower-level primitives or fold them behind the executor without changing session-file semantics.
+- Keep `saveAiAction` and `runAiAction` as the public lower-level primitives in `ai-action.ts`; keep `prepareRunnableScript` module-private and called only by `saveAiAction`. `action-executor.ts` imports the two public primitives and does not reimplement session-file preparation.
 - Ensure manual AI Action runs, auto-runs, auto-fix, and the test harness all use the same executor.
 - Add `ActionEvidence` construction and status classification.
+- Add the shared `ExpressionError`, `EvidenceValidationIssue`, and `RunStateDiff` contracts described above; normalize validator-native errors in the executor.
+- Preserve the legacy `AUTO_FIX_MAX = 3` and `triggerAutoFix -> handleSend` behavior in this phase. Only its save/run internals move through the executor.
 - Preserve warning behavior, risk confirmation, error annotation, recipe IDs, and original prompt logging.
 
 #### Files
 
 - New: `src/js/lib/action-executor.ts`
 - New: `src/js/lib/agent-turn-types.ts`
+- New: `src/shared/agent-evidence.ts`
+- Update: `src/shared/run-diff.ts`
 - Update: `src/js/main/main.svelte`
 - Update: `src/js/lib/ai-action.ts`
+- Update: `src/js/lib/auto-fix.ts`
+- Update: `src/js/lib/error-log.ts`
 - Update: `src/js/lib/test-harness.ts`
 - New: `tests/action-executor.test.ts`
 - Update: `scripts/run-unit-tests.mjs`
@@ -417,20 +543,24 @@ Estimated effort: high. Core product milestone.
 
 - Add `src/js/lib/agent-protocol.ts` for parsing `<ai-action>` plus `<ai-complete>` and the optional `verify` attribute.
 - Add `src/js/lib/agent-turn.ts` as the explicit state machine.
-- Replace recursive auto-fix calls to `handleSend` with state-machine transitions.
-- Add a separate provider transcript so intermediate model responses and evidence do not pollute rendered chat history.
-- Rebuild `systemContext` before every continuation while keeping `staticContext` byte-stable.
-- Add a protocol version to the static prelude; reset active provider sessions when that version changes.
+- Keep two explicit policies:
+  - Verification off: retain the existing `triggerAutoFix -> handleSend` recursion and `AUTO_FIX_MAX = 3` behavior for compatibility.
+  - Verification on: never call `triggerAutoFix`; validation/protocol failures use the two shared pre-execution repair slots, and runtime/expression evidence can only lead to completion or a staged correction.
+- Add the controller-owned `ProviderMessage[]` transcript and `ProviderTurnInput` provider signature described in Evidence-message mechanics. Intermediate model responses and evidence must not pollute rendered chat history.
+- Rebuild `systemContext` before every continuation while keeping each mode's `staticContext` byte-stable.
+- Author both exact model-facing protocol variants in `STATIC_PRELUDE`/`getStaticContext`, add both protocol-version constants, key the static-context cache by selected version, and implement the session-fingerprint reset behavior described above.
 - Add provider capability flags such as `supportsIterativeTurns` and `supportsImages`.
 - Implement hard limits:
-  - Three provider calls.
-  - Two validation repairs.
-  - One automatic mutation.
-  - Ten-minute overall deadline.
+  - Four provider calls total, always preserving capacity for the next evidence continuation.
+  - Two shared pre-execution repairs.
+  - One controller-managed execution attempt, claimed immediately before execution.
+  - Ten minutes of active controller time, paused during approval.
   - No continuation after cancellation.
 - Force all post-mutation corrections to stage-only.
 - Add a collapsed UI trace showing attempt number, validation, execution, evidence, preview, and completion.
-- Add an experimental “Verify actions with the model” setting, default off for the first release.
+- Add `src/js/components/VerificationToggle.svelte`, rendered at the bottom of the active-provider dropdown in `PanelHeader.svelte`. Store it under the exact localStorage key `ae-ai-chat.verify-actions-with-model.v1`, defaulting to `false` when absent or invalid.
+- On toggle change, `main.svelte` cancels `activeAgentTurn`, clears its transcript, resets `sessionId`, and then applies the new mode. Pass the setting through `PanelHeader` props; `ProviderPicker` does not own it.
+- Keep the controller instance in `main.svelte`. Tag every staged action with its `turnId`; the existing manual Run handler must call `activeAgentTurn.claimExecutionSlot(turnId)`, execute through the shared executor only when the claim succeeds, then call `resumeAfterApprovedAction(evidence)` only when that ID still matches. A stale action runs as an ordinary manual action and cannot resume a different turn.
 - Preserve legacy mode as the fallback and comparison baseline.
 
 #### Files
@@ -438,6 +568,8 @@ Estimated effort: high. Core product milestone.
 - New: `src/js/lib/agent-protocol.ts`
 - New: `src/js/lib/agent-turn.ts`
 - New: `src/js/components/AgentTrace.svelte`
+- New: `src/js/components/VerificationToggle.svelte`
+- Update: `src/js/components/PanelHeader.svelte`
 - Update: `src/js/main/main.svelte`
 - Update: `src/js/lib/context.ts`
 - Update: `src/js/lib/providers/provider.ts`
@@ -453,7 +585,10 @@ Estimated effort: high. Core product milestone.
 - Answer-only turns still call the provider once.
 - Safe verified turns run exactly one action and explicitly complete after evidence.
 - A second mutating action is always staged.
-- All limit, cancellation, approval, and partial-failure transitions are deterministic unit tests.
+- A worst-case valid turn follows call 1 invalid → call 2 invalid → call 3 valid action → call 4 evidence completion without exceeding a cap.
+- Legacy auto-fix parity tests still allow its existing three attempts, while verified-mode tests prove it is never invoked.
+- All call-reservation, active-deadline pause/resume, cancellation, approval, stale-turn, and partial-failure transitions are deterministic unit tests.
+- Toggling verification mid-session resets both native provider session and controller transcript, and the next call receives the correct static prelude.
 
 ### Phase 3: Add complete-frame visual verification
 
@@ -463,10 +598,13 @@ Estimated effort: medium.
 
 - Add a temporary preview API distinct from the user-facing screenshot action.
 - Write previews under `.session/previews/`, not the project's persistent `screenshots/` directory.
-- After `saveFrameToPng`, poll from CEP Node until the PNG ends with `IEND`, with a bounded timeout and file-size stability check.
+- If `getContextSnapshot` reports no active comp, skip capture with `no_active_comp` and continue state-only.
+- After `saveFrameToPng`, poll from CEP Node for at most 15 seconds until the PNG has a valid signature, ends with `IEND`, and has the same non-zero size on two polls 100 ms apart.
+- Downscale through macOS `/usr/bin/sips` using a fixed argument array, never a shell string or model-controlled path: longest edge at most 2,048 pixels, PNG output under `.session/previews/`, then repeat the signature/`IEND` validation.
+- Attach only a final PNG of at most 8 MiB. Delete and record `oversized` above that limit; do not retry at another size in the first release.
 - Add the preview only to providers whose capability says images are supported.
 - Ensure the Claude API message builder can attach an image to an internal evidence continuation.
-- Ensure Codex resume accepts an image on a continuation; if the installed CLI does not support that combination, fail closed to state-only evidence.
+- Use Codex's installed `codex exec resume -i <preview-path>` continuation. Check `codex --version` and `codex exec resume --help` during provider availability; if `-i` is absent, expose `supportsImages: false` for that installed version and continue state-only.
 - Delete previews after completion, cancellation, timeout, provider switch, and panel unload.
 - Never claim visual verification when capture or attachment failed.
 
@@ -483,8 +621,9 @@ Estimated effort: medium.
 #### Exit criteria
 
 - No truncated preview is attached.
+- No attached preview exceeds 2,048 pixels on its longest edge or 8 MiB.
 - One preview maximum is produced per turn.
-- State-only providers complete honestly without a preview.
+- State-only providers and missing-active-comp/capture/resize/size failures complete honestly with a precise fallback reason.
 - Temp previews are absent after cleanup paths.
 
 ### Phase 4: Add a message-matched scripting-DOM catalog
@@ -494,24 +633,25 @@ Estimated effort: medium-high, parallelizable after Phase 1.
 #### Source and provenance
 
 - Source directly from a pinned commit of `docsforadobe/after-effects-scripting-guide`, not from the Flue package.
-- Store the upstream commit, extraction date, generator version, and source path on every generated record or catalog manifest.
+- Give every record `{ sourceRepo, sourceCommit, sourcePath, provenance: "docs" }`. Emit one generated manifest with `{ sourceRepo, sourceCommit, extractedAt, generatorVersion, recordCount }`.
 - Mark records `docs`, not `verified`.
-- Exclude or subordinate effect match names already covered by the verified effect corpus.
+- Exclude generated records whose effect match name already exists in the verified effect corpus; do not emit a lower-priority duplicate.
 - Promote individual gotchas or recipes only after the existing live AE verification workflow.
 
 #### Tasks
 
-- Add an explicit generator command such as:
+- Add this exact generator command:
 
   ```bash
-  node scripts/generate-scripting-api.mjs --source <path-to-after-effects-scripting-guide>
+  node scripts/generate-scripting-api.mjs --source <path-to-after-effects-scripting-guide> --commit <40-character-sha>
   ```
 
 - Do not attach this work to a bare `generate-knowledge.mjs` invocation; that command has an outdated sibling-repo default.
 - Generate:
   - A compact class/member index for discovery.
   - Detailed records containing member type, signature, short description, version notes, and source.
-- Add `src/js/lib/knowledge/scripting-api.ts` with message matching and strict character/record caps.
+- Add `src/js/lib/knowledge/scripting-api.ts` with `MAX_SCRIPTING_API_CONTEXT_CHARS = 8_000`, `MAX_SCRIPTING_API_RECORDS = 8`, and `MAX_SCRIPTING_API_STATIC_INDEX_CHARS = 6_000`.
+- Reuse the token/keyword matching approach in `getMessageKnowledgeContext` and `expressionsKnowledge.getMessageContext`. Rank deterministically by exact qualified member (`CompItem.saveFrameToPng`) → exact member name → exact class name → keyword overlap → source order. Deduplicate by qualified member ID before applying caps.
 - Inject only records matched by user wording, present project state, or an explicitly requested operation.
 - Establish precedence:
   1. Runtime/live AE evidence.
@@ -519,14 +659,17 @@ Estimated effort: medium-high, parallelizable after Phase 1.
   3. `[DOCS]` scripting records.
   4. Model pretraining.
 - Add collision tests for effect names, expressions, properties, and scripting methods.
-- Add `pnpm scripting-api:check` for deterministic generation, provenance, matcher smoke tests, and prompt-budget enforcement.
+- Add `"scripting-api:generate": "node scripts/generate-scripting-api.mjs"` and `"scripting-api:check": "node scripts/check-scripting-api.mjs"` to `package.json`. Regenerate only with `pnpm scripting-api:generate -- --source <path-to-after-effects-scripting-guide> --commit <40-character-sha>`; the command must fail unless both arguments exist and `--commit` matches the source checkout's `HEAD`.
+- Make `pnpm scripting-api:check` verify deterministic generation, provenance, matcher smoke tests, the 6,000-character static index, and the eight-record/8,000-character per-message detail caps.
 - Document the new corpus and regeneration command in `AGENTS.md`.
 
 #### Files
 
 - New: `scripts/generate-scripting-api.mjs`
+- New: `scripts/check-scripting-api.mjs`
 - New: `src/js/lib/knowledge/scripting-api.ts`
 - New: `src/js/lib/knowledge/data/scripting-api.ts`
+- New: `src/js/lib/knowledge/data/scripting-api-manifest.ts`
 - Update: `src/js/lib/knowledge/index.ts`
 - New: `tests/scripting-api.test.ts`
 - Update: `scripts/run-unit-tests.mjs`
@@ -537,7 +680,7 @@ Estimated effort: medium-high, parallelizable after Phase 1.
 
 - Obscure scripting requests such as render-queue inspection or footage interpretation receive relevant documented signatures.
 - Effect requests continue using the verified effect catalog without conflicts.
-- Message-matched scripting context stays within its configured budget.
+- Static scripting index is at most 6,000 characters; matched detail is at most eight records and 8,000 characters for every test prompt.
 - Generated output is deterministic and committed.
 
 ### Phase 5: Add an optional dev-only JSON CLI
@@ -553,9 +696,11 @@ Estimated effort: small-medium. Developer workflow only.
   - `run --file <path>` through the dev panel's validated executor
   - `preview`
 - Return JSON on stdout and structured errors on stderr.
+- Use one response envelope for every command: success is `{ "version": 1, "ok": true, "command": "...", "data": {...} }`; failure is `{ "version": 1, "ok": false, "command": "...", "error": { "code": "...", "message": "...", "details": {...} } }` and exits non-zero.
 - Extend the dev-only test harness with executor-backed methods; do not expose raw arbitrary execution in packaged builds.
-- Add Just or `package.json` recipes for frequently used commands.
-- If a project skill is added, make it explicitly manual (`disable-model-invocation: true`) and document that panel providers run with skills disabled.
+- Add `"ae:agent": "node scripts/ae-agent-cli.mjs"` to `package.json`; documented invocations are `pnpm ae:agent -- status`, `context`, `run --file <path>`, and `preview`.
+- Do not add a project or global agent skill in this milestone. The JSON CLI is an explicit developer command, and panel providers continue running with skills disabled.
+- Add `scripts/README.md` covering the dev-panel prerequisite, exact commands, JSON schema/version, validated-executor boundary, and preview/temp-file cleanup.
 - Do not install any global skill or create a second CEP extension.
 
 #### Files
@@ -564,7 +709,7 @@ Estimated effort: small-medium. Developer workflow only.
 - Update: `scripts/ae-driver.mjs`
 - Update: `src/js/lib/test-harness.ts`
 - Update: `package.json`
-- Optional: `.claude/skills/ae-live/SKILL.md`
+- New: `scripts/README.md`
 - Update: `.claude/skills/verify-loop/README.md`
 
 #### Exit criteria
@@ -590,24 +735,27 @@ Estimated effort: medium, mostly verification.
   - Cancellation during verification.
   - Provider failure after a successful mutation.
   - Visual preview success and timeout.
-- Extend `window.__aeTest` to expose the agent trace and provider-call/mutation counts.
+- Extend `window.__aeTest` to expose the agent trace, provider-call count, verified-turn execution-attempt count, and observed state-diff count.
 - Run the fixture matrix for Claude API, Claude CLI, and Codex where configured.
 - Dogfood behind the experimental setting for at least one full verify-loop pass.
-- Compare with the one-shot baseline:
+- Define the rollout comparison set as the existing `add-shape-layer`, `change-selected-opacity`, and `add-gaussian-blur` fixtures plus three new complex fixtures named `verified-lower-third`, `verified-expression-rig`, and `verified-effect-stack`. Each fixture must declare expected layer/effect/expression/state-diff predicates rather than relying on prose judgment.
+- For each configured provider, run every comparison fixture three times in legacy mode and three times in verified mode against a freshly reset fixture project. Record:
   - Initial validation failure rate.
   - Runtime/expression failure rate.
   - Inconclusive action rate.
   - Provider calls and total latency.
   - Number of staged corrections.
   - User-visible duplicate/undo problems.
-- Enable verified mode by default only after the quality gain justifies the extra latency and model cost.
+- Score a legacy run successful when it returns no terminal error, all declared predicates pass, and no expression error remains; record its execution count separately. Score a verified run successful only when those same conditions hold, exactly one controller-managed execution attempt occurs, and the turn ends with `<ai-complete>`; a plain-text fallback is recorded separately and does not pass the rollout gate.
+- Enable verified mode by default only when, for every configured provider: the three simple fixtures have no lower success rate than legacy; the three complex fixtures improve by at least 20 percentage points in aggregate; zero run exceeds one verified-mode execution attempt; and median verified-mode latency is no more than 2.5 times legacy.
 
 #### Exit criteria
 
 - `pnpm test`, `pnpm typecheck`, `pnpm build`, `pnpm recipes:check`, `pnpm recipes:verify --all`, and `pnpm verify:e2e` pass.
-- No fixture produces more than one automatic mutation.
+- No verified-mode fixture produces more than one controller-managed execution attempt.
 - All providers either support the bounded loop or clearly fall back to one-shot mode.
 - Approval, cancellation, and cleanup work after both successful and failed provider calls.
+- The comparison report contains 18 legacy and 18 verified runs per configured provider, the declared predicates, raw counts, success rates, and latency medians.
 
 ## Acceptance criteria
 
@@ -616,7 +764,7 @@ Estimated effort: medium, mostly verification.
 - [ ] Legacy one-shot mode remains available and behaviorally compatible.
 - [ ] Verified mode sends runtime evidence back to the same provider conversation.
 - [ ] Iterative turns end through explicit completion, approval pause, cancellation, failure, or a hard cap.
-- [ ] Only one automatic AE mutation can occur per user turn.
+- [ ] Verified mode makes at most one controller-managed execution attempt per user turn, regardless of runtime outcome or observed diff.
 - [ ] Post-mutation corrections are staged and visible before execution.
 - [ ] Manual approval can resume the same turn with execution evidence.
 - [ ] Visual verification attaches a complete frame only to image-capable providers.
@@ -629,26 +777,26 @@ Estimated effort: medium, mostly verification.
 - [ ] Project-derived evidence remains inside the untrusted-data boundary.
 - [ ] Every mutation passes validation, warnings, and risk classification.
 - [ ] File, network, shell, dynamic-code, menu-command, and quit risks still require human confirmation.
-- [ ] Partial mutation prevents automatic retry.
+- [ ] Any execution attempt prevents automatic retry; a non-empty partial diff changes the user-facing recovery guidance but not the budget.
 - [ ] Preview paths are restricted to `.session/previews/` and cleaned up.
 - [ ] Provider or protocol failures never cause fallback execution.
 
 ### Reliability
 
-- [ ] Provider-call, validation-repair, mutation, preview, and total-time limits are enforced independently.
+- [ ] Provider-call, shared pre-execution-repair, execution-attempt, preview, and active-time limits are enforced independently.
 - [ ] Empty diffs remain explicitly inconclusive.
 - [ ] Expression assignment success is not treated as expression evaluation success.
 - [ ] Provider failure after mutation reports “verification interrupted,” not “action failed.”
-- [ ] Provider switching or panel unload cancels and clears pending turns safely.
-- [ ] Existing prompt-cache separation remains byte-stable for static context.
+- [ ] Provider/model/toggle switching or panel unload cancels and clears pending turns safely.
+- [ ] Each legacy/verified static-context variant remains byte-stable, and session-fingerprint changes force a fresh native provider session.
 
 ### Testing
 
-- [ ] Parser tests cover malformed, duplicate, conflicting, escaped, and legacy protocol responses.
+- [ ] Parser tests prove fenced protocol examples are inert and that duplicate, nested, unclosed, unsupported-attribute, and action-plus-completion responses are malformed in verified mode.
 - [ ] State-machine tests cover every transition and cap.
 - [ ] Executor tests cover safe, warning, risky, validation-error, runtime-error, expression-error, partial-diff, and no-op outcomes.
 - [ ] Provider argument tests prove isolation flags and fallback behavior.
-- [ ] Preview tests cover delayed/truncated PNGs, timeout, cleanup, and unsupported providers.
+- [ ] Preview tests cover no active comp, delayed/truncated PNGs, timeout, resize failure, 2,048-pixel/8-MiB caps, cleanup, and unsupported providers.
 - [ ] Knowledge tests cover matching, provenance, precedence, collisions, and character budgets.
 - [ ] Live AE E2E fixtures cover success, recovery, approval, cancellation, and visual verification.
 
@@ -657,7 +805,7 @@ Estimated effort: medium, mostly verification.
 - [ ] `README.md` explains verified mode, added latency/cost, approval pauses, and provider image differences.
 - [ ] `AGENTS.md` documents the scripting-DOM corpus, provenance, regeneration command, and precedence.
 - [ ] `.claude/skills/verify-loop/` includes the new fixture and trace workflow.
-- [ ] Automated dev CLI behavior has a concise README or skill instructions.
+- [ ] `scripts/README.md` documents the dev-only JSON CLI, prerequisites, commands, safety boundary, and cleanup behavior.
 - [ ] Flue is credited as architectural research, not added as a dependency.
 
 ## Success metrics
@@ -667,31 +815,31 @@ Measure locally from E2E reports and `.session/error-log.jsonl`; do not add tele
 | Metric | Target before default-on rollout |
 |---|---|
 | Existing E2E regression | 0 failures introduced |
-| Automatic mutations per user turn | ≤ 1 in every fixture |
-| Unbounded/stuck turns | 0; all stop at deadline or explicit terminal state |
+| Controller-managed execution attempts per verified turn | ≤ 1 in every fixture, including failures and empty diffs |
+| Unbounded/stuck active turns | 0; all stop within 600 seconds of active time or an explicit terminal state; approval time is excluded |
 | Expression errors claimed as success | 0 |
 | Empty diffs claimed as verified success | 0 |
-| Truncated previews attached | 0 |
+| Invalid, oversized, or over-dimension previews attached | 0 |
 | Temp preview leaks after terminal state | 0 |
 | Out-of-band CLI AE mutations | 0 |
-| Complex prompt success rate | Better than one-shot baseline on the same fixture set |
+| Complex prompt success rate | At least +20 percentage points vs. legacy across the three named complex fixtures for every configured provider |
+| Simple prompt success rate | No regression vs. legacy across the three named simple fixtures for every configured provider |
 | Median extra provider calls in verified mode | ≤ 1 for a valid first action |
 
 ## Risks and mitigations
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Extra model call increases latency and cost | Users may prefer current speed | Experimental opt-in, visible status, hard call/deadline caps, measure before default-on |
-| Multi-attempt actions create confusing undo history | User cannot easily reverse the full turn | One automatic mutation; stage corrections; report partial changes explicitly |
-| Final saved action is only a corrective delta | Re-running it may not recreate the full result | Disable or relabel one-click rerun for multi-step approved turns; consider later consolidated replay generation |
+| Extra model call increases latency and cost | Users may prefer current speed | Experimental opt-in, visible status, four-call/active-time caps, measure before default-on |
+| Multi-attempt actions create confusing undo history | User cannot easily reverse the full turn | One verified-mode execution attempt; stage corrections; report partial changes explicitly |
+| Final saved action is only a corrective delta | Re-running it may not recreate the full result | Disable one-click rerun for a completed turn that contains a staged/approved correction; keep only the labeled review-and-run affordance |
 | CLI provider discovers Flue/global skills | Mutation bypasses panel controls | Disable skills/tools/customizations and test launch arguments |
 | Provider-specific continuation behavior diverges | Inconsistent product behavior | Product-level state machine and conformance fixtures; native tools deferred |
 | Preview returns before PNG completion | Model judges corrupted image | Poll for `IEND`, size stability, and timeout before attachment |
 | API index conflicts with verified effect data | Reintroduces guessed match names | Explicit provenance and precedence; exclude duplicate effect records |
 | Fresh context contains prompt-injection strings | Model follows project data | Reuse defanging and untrusted boundary for every continuation |
-| Failed action partially mutates AE | Retry duplicates or compounds damage | Detect non-empty diff, halt auto-retry, require recovery choice |
-| Provider session contains old protocol | Model does not follow completion contract | Protocol versioning and session reset on upgrade |
-| `main.svelte` state remains too coupled | Loop becomes difficult to test | Extract executor and controller before adding UI behavior |
+| Failed action partially mutates AE | Retry duplicates or compounds damage | Consume the budget before execution regardless of diff; require a new turn or approved staged correction |
+| Provider session contains old protocol | Model does not follow completion contract | Fingerprint provider/model/mode/protocol and reset both session and transcript on any change |
 
 ## Alternatives considered
 
