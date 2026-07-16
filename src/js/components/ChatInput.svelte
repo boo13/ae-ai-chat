@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import ContextChipPill from "./ContextChip.svelte";
   import ContextPicker from "./ContextPicker.svelte";
   import type { ContextChip } from "../../shared/shared";
@@ -78,6 +79,15 @@
     textareaEl.style.height = "auto";
     const maxHeight = 120;
     textareaEl.style.height = Math.min(textareaEl.scrollHeight, maxHeight) + "px";
+  }
+
+  export async function prefill(value: string) {
+    text = value;
+    await tick();
+    if (!textareaEl) return;
+    textareaEl.focus();
+    autoResize();
+    textareaEl.setSelectionRange(value.length, value.length);
   }
 
   function handleDocumentMouseDown(event: MouseEvent) {

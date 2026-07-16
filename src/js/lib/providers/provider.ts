@@ -1,3 +1,5 @@
+import type { ParsedTutorial } from "../tutorial";
+
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
@@ -5,6 +7,7 @@ export interface ChatMessage {
   duration_ms?: number;
   isError?: boolean;
   diagnosticsRaw?: string;
+  tutorial?: ParsedTutorial;
 }
 
 export interface ProviderResult {

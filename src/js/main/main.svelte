@@ -14,7 +14,18 @@
     scanActionRisk,
   } from "../lib/ai-action";
   import ScriptViewer from "../components/ScriptViewer.svelte";
-  import { buildContext, type LastActionResult } from "../lib/context";
+  import TutorialViewer from "../components/TutorialViewer.svelte";
+  import {
+    buildContext,
+    type ChatMode,
+    type LastActionResult,
+  } from "../lib/context";
+  import {
+    outlineForHistory,
+    parseTutorialResponse,
+    type ParsedTutorial,
+    type TutorialStepAction,
+  } from "../lib/tutorial";
   import { logFailure } from "../lib/error-log";
   import { getErrorHint } from "../lib/error-patterns";
   import ChatMessageComponent from "../components/ChatMessage.svelte";
@@ -71,6 +82,9 @@
   let scriptViewerOpen: boolean = $state(false);
   let scriptViewerContent: string = $state("");
   let scriptViewerSummary: string = $state("");
+  let tutorialViewerOpen: boolean = $state(false);
+  let activeTutorial: ParsedTutorial | null = $state(null);
+  let chatInputRef: { prefill: (value: string) => Promise<void> } | undefined = $state();
   let activeAbortController: AbortController | null = $state(null);
   let activeStatus: ProviderStatusUpdate | null = $state(null);
   let pendingContexts: ContextChip[] = $state([]);
@@ -171,7 +185,12 @@
   function addMessage(
     role: ChatMessage["role"],
     content: string,
-    extra?: { duration_ms?: number; isError?: boolean; diagnosticsRaw?: string }
+    extra?: {
+      duration_ms?: number;
+      isError?: boolean;
+      diagnosticsRaw?: string;
+      tutorial?: ParsedTutorial;
+    }
   ): number {
     messages.push({
       role,
@@ -264,6 +283,13 @@
 
   function handleUpdateReleaseNotes() {
     if (availableUpdate) openLinkInBrowser(availableUpdate.releaseUrl);
+  }
+
+  function openTutorial(tutorial: ParsedTutorial | undefined) {
+    if (!tutorial) return;
+    activeTutorial = tutorial;
+    tutorialViewerOpen = true;
+    scriptViewerOpen = false;
   }
 
   async function triggerAutoFix(
@@ -375,15 +401,30 @@
   async function handleUserSend(text: string) {
     const ctxs = pendingContexts.slice();
     pendingContexts = [];
+    const slashCommand = text.match(/^\/(\w+)(?:\s+([\s\S]+))?$/);
+
+    if (slashCommand?.[1].toLowerCase() === "tutorial") {
+      if (!slashCommand[2]?.trim()) {
+        addMessage("system", "Usage: /tutorial <topic>");
+        return;
+      }
+      await handlePromptSend(text, ctxs, "tutorial");
+      return;
+    }
+
     await handlePromptSend(text, ctxs);
   }
 
-  async function handlePromptSend(text: string, pinned?: ContextChip[]) {
+  async function handlePromptSend(
+    text: string,
+    pinned?: ContextChip[],
+    mode?: ChatMode
+  ) {
     autoFixAttempt = 0;
     autoFixOriginalPrompt = text;
     autoFixAborted = false;
     rememberError("");
-    await handleSend(text, false, pinned);
+    await handleSend(text, false, pinned, mode);
   }
 
   async function scrollToBottom() {
@@ -393,7 +434,12 @@
     }
   }
 
-  async function handleSend(text: string, isAutoFix = false, pinned?: ContextChip[]) {
+  async function handleSend(
+    text: string,
+    isAutoFix = false,
+    pinned?: ContextChip[],
+    mode?: ChatMode
+  ) {
     if (!activeProvider) return;
 
     setAiActionWarnings([]);
@@ -419,7 +465,12 @@
         phase: "preparing",
         text: "Reading AE context...",
       });
-      const context = await buildContext(text, pinned, lastActionResult ?? undefined);
+      const context = await buildContext(
+        text,
+        pinned,
+        lastActionResult ?? undefined,
+        mode
+      );
       lastActionResult = null;
       sessionProjectRoot = context.projectRoot || sessionProjectRoot;
 
@@ -474,17 +525,36 @@
         if (!result.cancelled) rememberError(result.result);
       } else {
         const parsed = parseAiActionResponse(result.result);
-        const displayText = parsed.displayText || "AI Action updated.";
+        const parsedTutorial = parseTutorialResponse(parsed.displayText);
+        const tutorial = parsedTutorial.tutorial;
+        const displayText = parsedTutorial.displayText || "AI Action updated.";
+        const storedContent = tutorial
+          ? displayText + "\n\n" + outlineForHistory(tutorial)
+          : displayText;
 
         if (streamingIdx !== -1) {
           // Update the streamed message with the cleaned display text and duration
-          messages[streamingIdx].content = displayText;
+          messages[streamingIdx].content = storedContent;
           messages[streamingIdx].duration_ms = result.duration_ms;
+          messages[streamingIdx].tutorial = tutorial;
           streamingIdx = -1;
         } else {
-          addMessage("assistant", displayText, {
+          addMessage("assistant", storedContent, {
             duration_ms: result.duration_ms,
+            tutorial,
           });
+        }
+
+        if (tutorial) {
+          activeTutorial = tutorial;
+          tutorialViewerOpen = true;
+          scriptViewerOpen = false;
+          aiActionInjectedRecipeIds = context.diagnostics.recipeIds.slice();
+          aiActionOriginalUserMessage = autoFixOriginalPrompt || text;
+        }
+
+        if (parsedTutorial.multipleBlocks) {
+          addMessage("system", "Multiple tutorial blocks found — only the first was opened.");
         }
 
         if (parsed.multipleBlocks) {
@@ -714,10 +784,118 @@
     }
   }
 
+  async function handleTutorialStepRun(
+    action: TutorialStepAction
+  ): Promise<boolean> {
+    const validationErrors = action.validation.errors;
+    if (validationErrors.length > 0) {
+      addMessage(
+        "system",
+        "Tutorial step blocked by validation errors:\n" +
+          validationErrors.map((error) => `  [${error.code}] ${error.message}`).join("\n")
+      );
+      return false;
+    }
+
+    try {
+      if (!sessionProjectRoot) {
+        const context = await buildContext();
+        sessionProjectRoot = context.projectRoot || sessionProjectRoot;
+      }
+
+      const summary = `Tutorial step ${action.index + 1}: ${action.label}`;
+      const saved = saveAiAction(sessionProjectRoot, action.script, summary);
+      aiActionReady = true;
+      aiActionErrors = [];
+      setAiActionWarnings(action.validation.warnings);
+
+      if (action.validation.warnings.length > 0) {
+        addMessage(
+          "system",
+          "Running tutorial step despite validation warnings:\n" +
+            action.validation.warnings.map((warning) => warning.message).join("\n")
+        );
+      }
+
+      const runResult = await runAiAction(sessionProjectRoot);
+      lastActionRunResult = runResult;
+      const exprErrors: ExpressionError[] = (runResult as any)?.expressionErrors || [];
+
+      if (runResult && "error" in runResult && runResult.error) {
+        const errorStr = String(runResult.error);
+        addMessage("system", "Tutorial step failed: " + errorStr);
+        rememberError(
+          errorStr,
+          typeof runResult.errorLine === "number" ? runResult.errorLine : null
+        );
+        logAiActionFailure({
+          errorKind: "runtime",
+          errorString: errorStr,
+          script: action.script,
+          expressionErrors: exprErrors,
+          injectedRecipeIds: aiActionInjectedRecipeIds,
+          triggerPath: "manual-run",
+          originalUserMessage: aiActionOriginalUserMessage,
+        });
+        return false;
+      }
+
+      if (exprErrors.length > 0) {
+        const exprSummary = exprErrors
+          .map((error) =>
+            `prop "${error.name || "?"}" line ${error.line}: ${error.error}`
+          )
+          .join("; ");
+        addMessage(
+          "system",
+          "Tutorial step ran but expression errors occurred:\n" +
+            exprErrors.map((error) =>
+              `  prop "${error.name || "?"}" line ${error.line}: ${error.error}` +
+              (error.expr ? `\n    expr: "${error.expr}"` : "")
+            ).join("\n")
+        );
+        rememberError(exprSummary, null);
+        logAiActionFailure({
+          errorKind: "expression",
+          errorString: exprSummary,
+          script: action.script,
+          expressionErrors: exprErrors,
+          injectedRecipeIds: aiActionInjectedRecipeIds,
+          triggerPath: "manual-run",
+          originalUserMessage: aiActionOriginalUserMessage,
+        });
+        return false;
+      }
+
+      setAiActionWarnings([]);
+      const stateDiff = recordActionSuccess(runResult, saved.summary);
+      addMessage("system", formatRunSuccessMessage(stateDiff));
+      return true;
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      addMessage("system", "Tutorial step unavailable: " + errMsg);
+      rememberError(errMsg);
+      logAiActionFailure({
+        errorKind: "runtime",
+        errorString: errMsg,
+        script: action.script,
+        injectedRecipeIds: aiActionInjectedRecipeIds,
+        triggerPath: "manual-run",
+        originalUserMessage: aiActionOriginalUserMessage,
+      });
+      return false;
+    }
+  }
+
   async function handleAction(
     action: { label: string; prompt?: string; handler?: string },
     event?: MouseEvent
   ) {
+    if (action.handler === "startTutorial") {
+      await chatInputRef?.prefill("/tutorial ");
+      return;
+    }
+
     if (action.handler === "takeScreenshot") {
       await handleScreenshot();
       return;
@@ -785,6 +963,7 @@
           const firstLine = script.split("\n").find((l) => l.startsWith("// Summary:"));
           scriptViewerSummary = firstLine ? firstLine.replace("// Summary:", "").trim() : "";
           scriptViewerOpen = true;
+          tutorialViewerOpen = false;
         }
         return;
       }
@@ -979,6 +1158,10 @@
             content={msg.content}
             timestamp={msg.timestamp}
             duration_ms={msg.duration_ms}
+            tutorialTitle={msg.tutorial?.title}
+            onOpenTutorial={msg.tutorial
+              ? () => openTutorial(msg.tutorial)
+              : undefined}
           />
         {/if}
       {/each}
@@ -1016,6 +1199,16 @@
       />
     {/if}
 
+    {#if tutorialViewerOpen && activeTutorial}
+      {#key activeTutorial}
+        <TutorialViewer
+          tutorial={activeTutorial}
+          onRunStep={handleTutorialStepRun}
+          onclose={() => (tutorialViewerOpen = false)}
+        />
+      {/key}
+    {/if}
+
     {#if aiActionWarnings.length > 0}
       <div class="validation-banner">
         <div class="validation-banner__header">
@@ -1041,6 +1234,7 @@
     {/if}
 
     <ChatInput
+      bind:this={chatInputRef}
       disabled={isLoading}
       providerName={activeProvider.displayName}
       contexts={pendingContexts}

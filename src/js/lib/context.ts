@@ -7,6 +7,7 @@ import {
 } from "./knowledge/index";
 import { wrapUntrustedContext } from "./security";
 import { EXPRESSION_FUNCTION_NAMES } from "./knowledge/data/expressions";
+import { TUTORIAL_MODE_INSTRUCTIONS } from "./tutorial";
 
 interface ProjectInfo {
   projectName: string;
@@ -162,6 +163,8 @@ interface PinnedEffectDetail {
 }
 
 type PinnedDetail = PinnedCompDetail | PinnedLayerDetail | PinnedEffectDetail;
+
+export type ChatMode = "tutorial";
 
 export interface LastActionResult {
   summary: string;
@@ -597,7 +600,8 @@ function getStaticContext(): string {
 export async function buildContext(
   userMessage?: string,
   pinnedContexts?: ContextChip[],
-  lastAction?: LastActionResult
+  lastAction?: LastActionResult,
+  mode?: ChatMode
 ): Promise<ChatContext> {
   let projectRoot = "";
 
@@ -777,6 +781,10 @@ export async function buildContext(
   if (knowledgeContext.text) {
     lines.push("");
     lines.push(knowledgeContext.text);
+  }
+
+  if (mode === "tutorial") {
+    lines.push("", TUTORIAL_MODE_INSTRUCTIONS);
   }
 
   return {

@@ -8,9 +8,18 @@
     content: string;
     timestamp: number;
     duration_ms?: number;
+    tutorialTitle?: string;
+    onOpenTutorial?: () => void;
   }
 
-  let { role, content, timestamp, duration_ms }: Props = $props();
+  let {
+    role,
+    content,
+    timestamp,
+    duration_ms,
+    tutorialTitle,
+    onOpenTutorial,
+  }: Props = $props();
   let contentEl: HTMLDivElement | null = $state(null);
 
   const timeStr = $derived.by(() => {
@@ -21,10 +30,13 @@
   });
 
   const renderedContent = $derived.by(() => {
+    const displayContent = role === "assistant"
+      ? content.replace(/<tutorial\b[\s\S]*?(?:<\/tutorial>|$)/gi, "*…building tutorial…*")
+      : content;
     try {
-      return DOMPurify.sanitize(marked.parse(content, { async: false }) as string);
+      return DOMPurify.sanitize(marked.parse(displayContent, { async: false }) as string);
     } catch {
-      return DOMPurify.sanitize(content);
+      return DOMPurify.sanitize(displayContent);
     }
   });
 
@@ -71,6 +83,11 @@
         {@html renderedContent}
       {/if}
     </div>
+    {#if tutorialTitle && onOpenTutorial}
+      <button class="message__tutorial" type="button" onclick={onOpenTutorial}>
+        📖 Open tutorial: {tutorialTitle}
+      </button>
+    {/if}
   </div>
   {#if metaStr}
     <div class="message__meta">{metaStr}</div>
@@ -147,6 +164,26 @@
     font-size: 12.5px;
     margin: 0;
     white-space: pre-wrap;
+  }
+
+  .message__tutorial {
+    display: block;
+    width: 100%;
+    margin-top: 7px;
+    padding: 7px 0 0;
+    border: 0;
+    border-top: 1px solid var(--ae-line);
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .message__tutorial:hover {
+    color: var(--ae-text);
   }
 
   .message__meta {
