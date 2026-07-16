@@ -30,7 +30,7 @@ test("film-damage context includes the requested detailed effect records", () =>
     "Transform",
     "Fractal Noise",
     "Set Channels",
-    "Lumetri Color",
+    "Exposure",
     "CC Toner",
   ]) {
     assert.ok(displayNames.includes(required), `missing ${required}`);
