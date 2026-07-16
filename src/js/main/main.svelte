@@ -442,6 +442,7 @@
   ) {
     if (!activeProvider) return;
 
+    tutorialViewerOpen = false;
     setAiActionWarnings([]);
     aiActionErrors = [];
     const history = messages.slice();
@@ -1143,7 +1144,12 @@
       />
     {/if}
 
-    <div class="chat-area" bind:this={chatArea} data-select-scope="chat-history">
+    <div
+      class="chat-area"
+      class:chat-area--hidden={tutorialViewerOpen && !!activeTutorial}
+      bind:this={chatArea}
+      data-select-scope="chat-history"
+    >
       {#each messages as msg}
         {#if msg.isError}
           <ErrorBlock
@@ -1178,6 +1184,16 @@
       {/if}
     </div>
 
+    {#if tutorialViewerOpen && activeTutorial}
+      {#key activeTutorial}
+        <TutorialViewer
+          tutorial={activeTutorial}
+          onRunStep={handleTutorialStepRun}
+          onclose={() => (tutorialViewerOpen = false)}
+        />
+      {/key}
+    {/if}
+
     {#if pendingScreenshot}
       <div class="pending-screenshot">
         <span class="pending-screenshot__label">Attached: {pendingScreenshot.fileName}</span>
@@ -1197,16 +1213,6 @@
         }}
         onclose={() => (scriptViewerOpen = false)}
       />
-    {/if}
-
-    {#if tutorialViewerOpen && activeTutorial}
-      {#key activeTutorial}
-        <TutorialViewer
-          tutorial={activeTutorial}
-          onRunStep={handleTutorialStepRun}
-          onclose={() => (tutorialViewerOpen = false)}
-        />
-      {/key}
     {/if}
 
     {#if aiActionWarnings.length > 0}
@@ -1301,6 +1307,10 @@
     padding: 4px 0 6px;
     scrollbar-width: thin;
     scrollbar-color: rgba(255,255,255,0.12) transparent;
+  }
+
+  .chat-area--hidden {
+    display: none;
   }
 
   .chat-area::-webkit-scrollbar {

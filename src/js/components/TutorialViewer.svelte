@@ -108,11 +108,11 @@
 
 <div class="tutorial-viewer">
   <div class="tutorial-viewer__header">
+    <button class="tutorial-viewer__back" type="button" onclick={onclose}>‹ Chat</button>
     <div class="tutorial-viewer__heading">
       <span class="tutorial-viewer__eyebrow">Tutorial</span>
       <span class="tutorial-viewer__title">{tutorial.title}</span>
     </div>
-    <button class="tutorial-viewer__close" type="button" aria-label="Close" onclick={onclose}>×</button>
   </div>
   <div class="tutorial-viewer__body" bind:this={bodyEl}>
     {@html sanitizedHtml}
@@ -121,8 +121,10 @@
 
 <style>
   .tutorial-viewer {
-    flex-shrink: 0;
-    border-top: 1px solid var(--ae-line-2);
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
     background: rgb(20,20,20);
     color: var(--ae-text);
     text-align: left;
@@ -162,24 +164,28 @@
     white-space: nowrap;
   }
 
-  .tutorial-viewer__close {
-    margin-left: auto;
-    padding: 0 5px;
-    border: 0;
+  .tutorial-viewer__back {
+    flex: none;
+    padding: 3px 8px;
+    border: 1px solid var(--ae-line-2);
+    border-radius: 5px;
     background: transparent;
     color: var(--ae-text-2);
     cursor: pointer;
     font: inherit;
-    font-size: 16px;
-    line-height: 1;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
   }
 
-  .tutorial-viewer__close:hover {
+  .tutorial-viewer__back:hover {
     color: var(--ae-text);
+    border-color: var(--ae-text-3);
   }
 
   .tutorial-viewer__body {
-    max-height: min(360px, 45vh);
+    flex: 1;
+    min-height: 0;
     padding: 12px 13px 14px;
     overflow: auto;
     counter-reset: tutorial-step;
