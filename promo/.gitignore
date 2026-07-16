@@ -2,4 +2,6 @@ node_modules/
 out/
 build/
 src/footage-manifest.generated.ts
+src/audio-manifest.generated.ts
 public/footage/*.mp4
+public/audio/*.mp3

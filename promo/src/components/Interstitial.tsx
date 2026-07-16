@@ -1,4 +1,4 @@
-import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Easing, interpolate, useCurrentFrame} from 'remotion';
 
 type InterstitialProps = {
   headline: string;
@@ -6,6 +6,9 @@ type InterstitialProps = {
   headlineSize: number;
   rule?: boolean;
   detailMono?: boolean;
+  pushIn?: boolean;
+  durationInFrames?: number;
+  overlay?: boolean;
 };
 
 export const Interstitial = ({
@@ -14,18 +17,28 @@ export const Interstitial = ({
   headlineSize,
   rule = false,
   detailMono = false,
+  pushIn = false,
+  durationInFrames = 1,
+  overlay = false,
 }: InterstitialProps) => {
   const frame = useCurrentFrame();
   const reveal = interpolate(frame, [0, 6], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+  const zoom = pushIn
+    ? interpolate(frame, [0, durationInFrames], [1, 1.03], {
+        easing: Easing.bezier(0.33, 0, 0.2, 1),
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      })
+    : 1;
 
   return (
-    <AbsoluteFill className="interstitial">
+    <AbsoluteFill className={overlay ? 'interstitial interstitial--overlay' : 'interstitial'}>
       <div
         className="interstitial__content"
-        style={{opacity: reveal, transform: `translateY(${(1 - reveal) * 10}px)`}}
+        style={{opacity: reveal, transform: `translateY(${(1 - reveal) * 10}px) scale(${zoom})`}}
       >
         {rule ? <div className="interstitial__rule" /> : null}
         <div className="interstitial__headline" style={{fontSize: headlineSize}}>

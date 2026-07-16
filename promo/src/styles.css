@@ -41,9 +41,13 @@ body {
 
 .interstitial__content {
   position: absolute;
-  top: 44%;
+  top: 48%;
   left: var(--left-margin);
   transform-origin: left center;
+}
+
+.interstitial--overlay {
+  background: transparent;
 }
 
 .interstitial__rule,
@@ -441,6 +445,10 @@ body {
   pointer-events: none;
 }
 
+.grade__vignette--capture {
+  background: radial-gradient(circle at center, transparent 58%, rgba(10, 11, 13, 0.12) 100%);
+}
+
 .footage-frame,
 .footage-slate {
   background: var(--background);
@@ -469,8 +477,43 @@ body {
   letter-spacing: 0.08em;
 }
 
+.caption-chip {
+  position: absolute;
+  z-index: 5;
+  bottom: 11%;
+  left: var(--left-margin);
+  padding-left: 18px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.2;
+  text-shadow: 0 2px 18px rgba(10, 11, 13, 0.9);
+}
+
+.caption-chip::before {
+  position: absolute;
+  top: 0.12em;
+  bottom: 0.12em;
+  left: 0;
+  width: 4px;
+  background: var(--accent);
+  content: "";
+}
+
+.trust-scene__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: linear-gradient(90deg, rgba(10, 11, 13, 0.78) 0%, rgba(10, 11, 13, 0.36) 48%, transparent 78%);
+}
+
+.trust-scene .interstitial {
+  z-index: 5;
+}
+
 .end-card__reveal {
-  transform-origin: left center;
+  transform-origin: var(--left-margin) center;
 }
 
 .end-card__content {
