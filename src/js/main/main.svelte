@@ -1249,15 +1249,17 @@
       onContextAdd={handleContextAdd}
       onContextRemove={handleContextRemove}
     />
-    <ActionBar
-      disabled={isLoading}
-      providerName={activeProvider.displayName}
-      supportsImages={activeProvider.supportsImages}
-      hasError={Boolean(lastError)}
-      {aiActionReady}
-      aiActionBlocked={aiActionErrors.length > 0}
-      onclick={handleAction}
-    />
+    {#if !(tutorialViewerOpen && activeTutorial)}
+      <ActionBar
+        disabled={isLoading}
+        providerName={activeProvider.displayName}
+        supportsImages={activeProvider.supportsImages}
+        hasError={Boolean(lastError)}
+        {aiActionReady}
+        aiActionBlocked={aiActionErrors.length > 0}
+        onclick={handleAction}
+      />
+    {/if}
   </div>
 {/if}
 
