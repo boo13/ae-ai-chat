@@ -94,11 +94,27 @@ Enable CEP debug mode with a tool such as [ZXP Installer](https://aescripts.com/
 
 Download the latest `.zxp` from [GitHub Releases](https://github.com/boo13/ae-ai-chat/releases) and install it with [ZXP Installer](https://aescripts.com/learn/zxp-installer/). The panel appears under **Window > Extensions > AE AI Chat**.
 
-**Build from source** (needs Node.js 22.13+):
+**Build from source** (needs Node.js 22.13+ and pnpm 11; the exact pnpm version is pinned in `package.json`):
 ```bash
 pnpm install && pnpm build && pnpm symlink
 ```
 Restart AE and open **Window > Extensions > AE AI Chat (dev)**. Both builds can coexist in the menu.
+
+---
+
+## Development checks
+
+Run `pnpm check` before submitting a change. It runs typechecking, unit tests,
+recipe matching checks, and the CEP build. Run `pnpm audit` to check dependencies
+for known advisories.
+
+GitHub Actions runs these checks on branch pushes and pull requests. Releases
+also run unit tests and recipe checks before packaging. Both workflows reject
+high or critical advisories in production dependencies.
+
+Live After Effects checks are separate: `pnpm recipes:verify` tests recipe scripts
+and `pnpm verify:e2e` exercises prompts with AE and the dev panel open. The
+automated build does not establish that a recipe works inside AE.
 
 ---
 

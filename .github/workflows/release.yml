@@ -12,6 +12,7 @@ jobs:
   release:
     name: Build and upload signed ZXP
     runs-on: macos-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -24,14 +25,21 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
-        with:
-          version: 11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Check recipes
+        run: pnpm recipes:check
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=high
 
       - name: Verify signing secret
         run: test -n "$ZXP_CERT_PASSWORD"
