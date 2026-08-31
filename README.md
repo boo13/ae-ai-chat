@@ -104,7 +104,7 @@ Restart AE and open **Window > Extensions > AE AI Chat (dev)**. Both builds can 
 
 ## Development checks
 
-Run `pnpm check` before submitting a change. It runs typechecking, unit tests,
+Run `pnpm check` before submitting a change. It runs typechecking, unit tests, panel interaction tests,
 recipe matching checks, and the CEP build. Run `pnpm audit` to check dependencies
 for known advisories.
 
@@ -156,6 +156,48 @@ You'll see the new layer appear in your comp. Every change runs as a single undo
 - **Report** — runs a deeper comp analysis and caches a richer summary (effects, expressions) for later prompts
 - **Fix** — sends the most recent error back to the model for diagnosis
 - **AI Action** — re-runs the last action the AI generated (disabled until you've run one)
+
+---
+
+## Conversations and action results
+
+The panel keeps conversations and unfinished prompts locally, grouped by the
+saved AE project's full path. Use the conversation picker or **New chat** to
+switch tasks. Changing AI providers preserves the conversation, and each
+provider remembers its last model. **Copy**, **Copy message**, and **Export** let
+you reuse or save the text as Markdown.
+
+Storage retains up to 30 recent conversations, 200 messages per conversation,
+and 20 creative presets. Unsaved AE projects share an **Unsaved project** group;
+save the AE project to give it its own group. API keys and raw diagnostics are
+excluded from chat storage. A storage error appears in the panel; export useful
+chats before closing if saving is unavailable. **Manage chats** lets you export
+and remove chats from any project, with confirmation before removal. If saved
+data cannot be read, back it up before explicitly replacing it from the warning.
+Restored tutorials retain a text
+outline; completed step actions remain available as cards.
+
+Every generated action has its own **Review script** and **Run** controls, along
+with validation issues and the changes detected in AE. Restoring a chat never
+runs its scripts. Actions interrupted by closing the panel are marked
+inconclusive. An empty result diff is also inconclusive, rather than proof that
+the requested edit worked.
+
+**Review results after running** adds one model request to assess the measured
+changes. Claude API and compatible Claude CLI versions support isolated,
+tool-free reviews. Older Claude CLI versions report that review is unavailable;
+Codex displays measured changes without a model review. Review cannot execute
+another action or establish visual correctness. With review enabled, an
+execution failure does not automatically retry the mutation.
+After fixing a missing AE precondition, use **Run again** for an explicit retry;
+the script is validated again before execution. Restored and provider-switched
+chats pass bounded script and result history into the next request.
+
+Choose **Save preset** on an action with detected changes, then open **Presets**
+to adjust its color, intensity, and duration. **Prepare prompt** fills the
+composer for the current selection; send it when ready. Starting suggestions
+also adapt to selected text, shape, or footage layers. Use **Refresh** after
+changing the selection if the suggestions have not updated yet.
 
 ---
 

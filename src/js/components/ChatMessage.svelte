@@ -2,6 +2,7 @@
   import DOMPurify from "dompurify";
   import { marked } from "marked";
   import { openLinkInBrowser } from "../lib/utils/bolt";
+  import { copyText } from "../lib/chat-export";
 
   interface Props {
     role: "user" | "assistant" | "system";
@@ -21,6 +22,7 @@
     onOpenTutorial,
   }: Props = $props();
   let contentEl: HTMLDivElement | null = $state(null);
+  let copyStatus = $state("");
 
   const timeStr = $derived.by(() => {
     const d = new Date(timestamp);
@@ -92,9 +94,14 @@
   {#if metaStr}
     <div class="message__meta">{metaStr}</div>
   {/if}
+  {#if role !== "system"}
+    <button class="message__copy" type="button" onclick={async () => { try { await copyText(content); copyStatus = "Copied"; } catch { copyStatus = "Copy failed"; } }}>{copyStatus || "Copy message"}</button>
+  {/if}
 </div>
 
 <style>
+  .message__copy { border: 0; background: none; padding: 1px 6px; color: var(--ae-text-3); font: inherit; font-size: 10px; text-align: left; cursor: pointer; }
+  .message__copy:hover { color: var(--accent); }
   .message {
     display: flex;
     flex-direction: column;

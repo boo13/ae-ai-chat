@@ -8,6 +8,7 @@ import {
 import { wrapUntrustedContext } from "./security";
 import { EXPRESSION_FUNCTION_NAMES } from "./knowledge/data/expressions";
 import { TUTORIAL_MODE_INSTRUCTIONS } from "./tutorial";
+import type { SelectionSummary } from "./selection-suggestions";
 
 interface ProjectInfo {
   projectName: string;
@@ -180,9 +181,31 @@ export interface ChatContext {
   // Per-turn AE state and message-matched knowledge.
   systemContext: string;
   projectRoot?: string;
+  projectKey: string;
+  snapshotAvailable: boolean;
+  projectName: string;
+  selection: SelectionSummary;
   diagnostics: {
     recipeIds: string[];
   };
+}
+
+function snapshotSummary(snapshot: ContextSnapshot | null) {
+  return {
+    projectKey: snapshot?.project?.projectPath || "unsaved",
+    snapshotAvailable: Boolean(snapshot),
+    projectName: snapshot?.project?.projectName || "Unsaved project",
+    selection: {
+      hasComp: Boolean(snapshot?.comp?.name && !snapshot.comp.error),
+      layerTypes: snapshot?.comp?.selectedLayers?.map((layer) => layer.type) || [],
+      layerNames: snapshot?.comp?.selectedLayers?.map((layer) => layer.name) || [],
+    },
+  };
+}
+
+export async function getWorkspaceContext() {
+  const snapshot = await fetchContextSnapshot();
+  return snapshot ? snapshotSummary(snapshot) : null;
 }
 
 type CompChip = Extract<ContextChip, { type: "comp" }>;
@@ -792,5 +815,6 @@ export async function buildContext(
     systemContext: lines.join("\n"),
     projectRoot: projectRoot || undefined,
     diagnostics: knowledgeContext.diagnostics,
+    ...snapshotSummary(snapshot),
   };
 }

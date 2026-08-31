@@ -35,6 +35,9 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Panel interaction tests
+        run: pnpm test:ui
+
       - name: Check recipes
         run: pnpm recipes:check
 

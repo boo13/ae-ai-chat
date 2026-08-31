@@ -1,6 +1,7 @@
 import { child_process, fs, os, path } from "../cep/node";
 import {
   buildProviderEnv,
+  buildFullPrompt,
   findGitRoot,
   resolveWorkingDirectory,
   summarizeProcessError,
@@ -10,6 +11,7 @@ import type {
   ProviderResult,
   ProviderStatusUpdate,
   SendMessageOptions,
+  ChatMessage,
 } from "./provider";
 
 let cachedCodexPath: string | null = null;
@@ -440,7 +442,8 @@ function hasResolvedCodexBinary(): boolean {
 
 async function sendCodexMessage(
   prompt: string,
-  options: SendMessageOptions
+  options: SendMessageOptions,
+  history: ChatMessage[] = []
 ): Promise<ProviderResult> {
   return new Promise((resolve) => {
     if (!child_process || !child_process.spawn) {
@@ -536,7 +539,7 @@ async function sendCodexMessage(
     ]
       .filter(Boolean)
       .join("\n\n");
-    const fullPrompt = contextPrefix ? contextPrefix + "\n\n" + prompt : prompt;
+    const fullPrompt = buildFullPrompt(contextPrefix, prompt, options.sessionId ? [] : history);
     const startTime = Date.now();
     const diagnostics = buildLaunchDiagnostics(options);
     logLaunchDiagnostics(diagnostics);

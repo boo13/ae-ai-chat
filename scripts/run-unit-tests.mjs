@@ -14,6 +14,11 @@ import ts from "typescript";
 const repoRoot = resolve(import.meta.dirname, "..");
 const tempRoot = mkdtempSync(join(tmpdir(), "ae-ai-chat-tests-"));
 const sourceFiles = [
+  "src/js/lib/workspace-state.ts",
+  "src/js/lib/action-evidence.ts",
+  "src/js/lib/selection-suggestions.ts",
+  "src/js/lib/providers/reviewer.ts",
+  "src/js/lib/providers/shared.ts",
   "src/js/lib/expression-rewriter.ts",
   "src/js/lib/security.ts",
   "src/js/lib/tutorial.ts",

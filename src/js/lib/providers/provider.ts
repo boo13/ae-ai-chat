@@ -63,6 +63,10 @@ export interface ProviderDefinition {
   displayName: string;
   models: ProviderModel[];
   supportsImages: boolean;
+  reviewAction?: (
+    prompt: string,
+    options: Pick<SendMessageOptions, "model" | "signal" | "onStatus">
+  ) => Promise<ProviderResult>;
   isAvailable(): Promise<{ available: boolean; reason?: string }>;
   sendMessage: (
     prompt: string,

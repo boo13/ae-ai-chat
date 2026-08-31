@@ -1,18 +1,22 @@
 import { child_process, crypto, fs, os, path } from "../cep/node";
 import {
   buildProviderEnv,
+  buildFullPrompt,
   resolveWorkingDirectory,
   summarizeProcessError,
 } from "./shared";
+import { claudeReviewArgs, supportsClaudeReview } from "./reviewer";
 import type {
   ProviderDefinition,
   ProviderResult,
   ProviderStatusUpdate,
   SendMessageOptions,
+  ChatMessage,
 } from "./provider";
 
 let cachedClaudePath: string | null = null;
 let cachedNodeDir: string | null = null;
+let reviewSupported: boolean | undefined;
 
 const CLAUDE_TIMEOUT_MS = 600000; // 10 min — matches Codex
 const CLAUDE_STALL_MS = 30000;
@@ -283,7 +287,9 @@ function hasResolvedClaudeBinary(): boolean {
 
 async function sendClaudeMessage(
   prompt: string,
-  options: SendMessageOptions
+  options: SendMessageOptions,
+  history: ChatMessage[] = [],
+  reviewOnly = false
 ): Promise<ProviderResult> {
   return new Promise((resolve) => {
     if (!child_process || !child_process.spawn) {
@@ -300,6 +306,18 @@ async function sendClaudeMessage(
     };
 
     const model = normalizeClaudeModel(options.model);
+    if (reviewOnly) {
+      if (reviewSupported === undefined) {
+        try {
+          const help = child_process.spawnSync(findClaudePath(), ["--help"], { env: getCleanEnv(), encoding: "utf8", timeout: 5000 });
+          reviewSupported = help.status === 0 && supportsClaudeReview(String(help.stdout));
+        } catch { reviewSupported = false; }
+      }
+      if (!reviewSupported) {
+        resolve({ result: "Update Claude CLI to a version with safe mode and tool-free review support.", duration_ms: 0, is_error: true });
+        return;
+      }
+    }
     const sessionId = options.sessionId || generateSessionId();
     // The static knowledge corpus only needs to be sent once per session —
     // resumed sessions already carry it in their history.
@@ -309,7 +327,7 @@ async function sendClaudeMessage(
     ]
       .filter(Boolean)
       .join("\n\n");
-    const fullPrompt = contextPrefix ? contextPrefix + "\n\n" + prompt : prompt;
+    const fullPrompt = buildFullPrompt(contextPrefix, prompt, options.sessionId || reviewOnly ? [] : history);
     const startTime = Date.now();
 
     const cwd = resolveWorkingDirectory(options.projectRoot) || os.tmpdir();
@@ -336,12 +354,12 @@ async function sendClaudeMessage(
     const baseArgs = [
       "--print",
       "--model", model,
-      "--dangerously-skip-permissions",
+      ...(reviewOnly ? claudeReviewArgs() : ["--dangerously-skip-permissions"]),
       "--output-format", "stream-json",
       "--verbose",
       "--include-partial-messages",
     ];
-    const args = options.sessionId
+    const args = reviewOnly ? baseArgs : options.sessionId
       ? [...baseArgs, "--resume", sessionId]
       : [...baseArgs, "--session-id", sessionId];
 
@@ -684,6 +702,10 @@ export const claudeProvider: ProviderDefinition = {
     { value: "fable", label: "Fable 5" },
   ],
   supportsImages: false,
+  reviewAction: async (prompt, options) => {
+    const { sessionId: _sessionId, ...result } = await sendClaudeMessage(prompt, { ...options, systemContext: "" }, [], true);
+    return result;
+  },
   async isAvailable() {
     return hasResolvedClaudeBinary()
       ? { available: true }

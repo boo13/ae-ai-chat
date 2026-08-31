@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { fs } from "../cep/node";
+import { REVIEW_SYSTEM } from "../action-evidence";
+import { providerHistory } from "./shared";
 import type {
   ChatMessage,
   ProviderDefinition,
@@ -64,12 +66,7 @@ async function sendClaudeMessage(
   const startTime = Date.now();
   let hasReceivedChunk = false;
 
-  const messages: Anthropic.MessageParam[] = history
-    .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
+  const messages: Anthropic.MessageParam[] = providerHistory(history);
 
   if (options.imagePath) {
     const imageBlock = buildImageBlock(options.imagePath);
@@ -197,6 +194,7 @@ export const claudeApiProvider: ProviderDefinition = {
     { value: "claude-fable-5", label: "Fable 5" },
   ],
   supportsImages: true,
+  reviewAction: (prompt, options) => sendClaudeMessage(prompt, { ...options, systemContext: REVIEW_SYSTEM }, []),
   async isAvailable() {
     return resolveApiKey()
       ? { available: true }

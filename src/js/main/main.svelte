@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { evalTS, openLinkInBrowser } from "../lib/utils/bolt";
   import ProviderPicker from "../components/ProviderPicker.svelte";
   import { providerRegistry } from "../lib/provider-config";
@@ -17,6 +17,8 @@
   import TutorialViewer from "../components/TutorialViewer.svelte";
   import {
     buildContext,
+    getWorkspaceContext,
+    type ChatContext,
     type ChatMode,
     type LastActionResult,
   } from "../lib/context";
@@ -36,6 +38,13 @@
   import StreamingRow from "../components/StreamingRow.svelte";
   import Suggestions from "../components/Suggestions.svelte";
   import UpdateBanner from "../components/UpdateBanner.svelte";
+  import WorkspaceBar from "../components/WorkspaceBar.svelte";
+  import ActionCard from "../components/ActionCard.svelte";
+  import { STORAGE_KEY, createWorkspaceState, createConversation, loadWorkspace, saveWorkspace, conversationMarkdown, createPreset, buildPresetPrompt, type Conversation, type WorkspaceMessage, type ActionRecord, type CreativePreset } from "../lib/workspace-state";
+  import { summarizeActionResult, reviewActionResult } from "../lib/action-evidence";
+  import { selectionSuggestions, type SelectionSummary } from "../lib/selection-suggestions";
+  import { copyText, exportMarkdown } from "../lib/chat-export";
+  import { validateScript } from "../lib/knowledge/validator";
   import type { ScriptValidationError, ScriptValidationWarning } from "../lib/knowledge/validator";
   import { buildAutoFixPrompt } from "../lib/auto-fix";
   import { getRuntimeEnvironment } from "../lib/runtime-environment";
@@ -63,13 +72,30 @@
       : runtimeEnvironment.reason;
   })();
 
-  let messages: ChatMessage[] = $state([]);
+  let messages: WorkspaceMessage[] = $state([]);
+  let workspace = $state(createWorkspaceState());
+  let workspaceLoaded = $state(false);
+  let conversationId = $state("");
+  let draft = $state("");
+  let projectKey = $state("unsaved");
+  let projectName = $state("Unsaved project");
+  let selection: SelectionSummary = $state({ hasComp: false, layerTypes: [], layerNames: [] });
+  let storageError = $state("");
+  let notice = $state("");
+  let storageBlocked = $state(false);
+  let recoveryPending = $state(false);
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let refreshingContext = false;
+  let disposed = false;
+  let stagedAction: ActionRecord | null = $state(null);
+  const projectConversations = $derived(conversationsForProject(projectKey));
   let isLoading: boolean = $state(false);
   let activeProvider: ProviderDefinition | null = $state(null);
   let model: string = $state(providerRegistry[0]?.models[0]?.value || "");
   let sessionId: string | undefined = $state(undefined);
   let chatArea: HTMLDivElement | undefined = $state();
   let lastError: string = $state("");
+  const suggestions = $derived(selectionSuggestions(selection, Boolean(lastError)));
   let lastErrorLine: number | null = $state(null);
   let pendingScreenshot: { path: string; fileName: string } | null = $state(null);
   let sessionProjectRoot: string | undefined = $state();
@@ -99,40 +125,275 @@
   let autoFixAborted: boolean = $state(false);
   const AUTO_FIX_MAX = 3;
 
-  // Post-run verification: what the last successful AI Action changed in the
-  // active comp, included in the next message's context so the model can
-  // confirm the action did what it claimed.
   let lastActionResult: LastActionResult | null = null;
   let lastActionRunResult: unknown = null;
 
-  function recordActionSuccess(runResult: unknown, summary: string): string[] {
-    const result = runResult && typeof runResult === "object"
-      ? runResult as Record<string, unknown>
-      : {};
-    const rawDiff = result.stateDiff;
-    const stateDiff: string[] = Array.isArray(rawDiff) ? rawDiff.map(String) : [];
-    const rawExpressionsSet = result.expressionsSet;
-    const expressionsSet = Array.isArray(rawExpressionsSet)
-      ? rawExpressionsSet.map((entry) => {
-          const record = entry && typeof entry === "object"
-            ? entry as Record<string, unknown>
-            : {};
-          return {
-            name: String(record.name || "Expression"),
-            layer: record.layer ? String(record.layer) : undefined,
-          };
-        })
-      : [];
-    lastActionResult = { summary, ranAt: Date.now(), stateDiff, expressionsSet };
-    return stateDiff;
+  function conversationsForProject(key: string): Conversation[] {
+    return workspace.conversations.filter((item) => item.projectKey === key).sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  function formatRunSuccessMessage(stateDiff: string[]): string {
-    if (stateDiff.length === 0) return "AI Action executed successfully.";
-    return (
-      "AI Action executed successfully.\nChanges:\n" +
-      stateDiff.map((note) => "  " + note).join("\n")
-    );
+  function persistConversation() {
+    if (!workspaceLoaded) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    const conversation = workspace.conversations.find((item) => item.id === conversationId);
+    if (conversation && activeProvider) {
+      conversation.messages = $state.snapshot(messages);
+      conversation.draft = draft;
+      conversation.providerId = activeProvider.id;
+      conversation.model = model;
+      conversation.updatedAt = Date.now();
+      conversation.title = messages.find((message) => message.role === "user")?.content.replace(/\s+/g, " ").slice(0, 70) || "New conversation";
+      workspace.activeConversationId = conversation.id;
+      workspace.models[activeProvider.id] = model;
+    }
+    if (storageBlocked) return;
+    try { storageError = saveWorkspace(localStorage, $state.snapshot(workspace)).error || ""; }
+    catch { storageError = "Conversation storage is unavailable. Export this chat before closing the panel."; }
+  }
+
+  $effect(() => {
+    if (!workspaceLoaded || !conversationId) return;
+    for (const message of messages) {
+      message.content;
+      message.action?.status;
+      message.action?.verification;
+      message.action?.errors;
+      message.action?.warnings;
+      message.action?.changes;
+    }
+    draft; model; activeProvider;
+    untrack(() => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(persistConversation, 250);
+    });
+    return () => { if (saveTimer) clearTimeout(saveTimer); };
+  });
+
+  function resetConversationRuntime() {
+    sessionId = undefined;
+    rememberError("");
+    pendingScreenshot = null;
+    pendingContexts = [];
+    lastActionResult = null;
+    lastActionRunResult = null;
+    stagedAction = null;
+    aiActionReady = false;
+    aiActionErrors = [];
+    setAiActionWarnings([]);
+    tutorialViewerOpen = false;
+    activeTutorial = null;
+    scriptViewerOpen = false;
+    setStatus(null);
+  }
+
+  function restoreConversation(conversation: Conversation) {
+    resetConversationRuntime();
+    conversationId = conversation.id;
+    messages = conversation.messages;
+    draft = conversation.draft;
+    activeProvider = providerRegistry.find((provider) => provider.id === conversation.providerId) || activeProvider;
+    if (activeProvider) model = activeProvider.models.find((item) => item.value === conversation.model)?.value || activeProvider.models.find((item) => item.value === workspace.models[activeProvider!.id])?.value || activeProvider.models[0]?.value || "";
+    workspace.activeConversationId = conversation.id;
+    scrollToBottom();
+  }
+
+  function newConversation() {
+    if (isLoading || !activeProvider) return;
+    persistConversation();
+    const conversation = createConversation(projectKey, projectName, activeProvider.id, model);
+    workspace.conversations.push(conversation);
+    restoreConversation(conversation);
+    addMessage("system", "Ask about this project, or select layers to get started.");
+    persistConversation();
+  }
+
+  function selectConversation(id: string) {
+    if (isLoading) return;
+    const conversation = workspace.conversations.find((item) => item.id === id && item.projectKey === projectKey);
+    if (!conversation) return;
+    persistConversation();
+    restoreConversation(conversation);
+    persistConversation();
+  }
+
+  function syncProject(context: Pick<ChatContext, "projectKey" | "projectName" | "selection">) {
+    selection = context.selection;
+    if (context.projectKey === projectKey && conversationId) return;
+    persistConversation();
+    projectKey = context.projectKey;
+    projectName = context.projectName;
+    const conversations = conversationsForProject(projectKey);
+    const saved = conversations.find((item) => item.id === workspace.activeConversationId) || conversations[0];
+    if (saved) restoreConversation(saved);
+    else if (activeProvider) {
+      const conversation = createConversation(projectKey, projectName, activeProvider.id, model);
+      workspace.conversations.push(conversation);
+      restoreConversation(conversation);
+    }
+  }
+
+  async function refreshWorkspaceContext() {
+    if (disposed || isLoading || refreshingContext || !workspaceLoaded) return;
+    refreshingContext = true;
+    try {
+      const context = await getWorkspaceContext();
+      if (context && !disposed && !isLoading) syncProject(context);
+    } finally { refreshingContext = false; }
+  }
+
+  function changeModel(value: string) {
+    if (isLoading || !activeProvider) return;
+    model = value;
+    workspace.models[activeProvider.id] = value;
+    sessionId = undefined;
+    persistConversation();
+  }
+
+  async function copyConversation() {
+    persistConversation();
+    const conversation = workspace.conversations.find((item) => item.id === conversationId);
+    if (!conversation) return;
+    try { await copyText(conversationMarkdown(conversation)); notice = "Conversation copied."; }
+    catch (error) { notice = String(error); }
+  }
+
+  function exportConversation(id = conversationId) {
+    persistConversation();
+    const conversation = workspace.conversations.find((item) => item.id === id);
+    if (!conversation) return;
+    try { if (exportMarkdown(conversation.title, conversationMarkdown(conversation))) notice = "Conversation exported."; }
+    catch (error) { notice = String(error); }
+  }
+
+  function removeConversation(id: string) {
+    if (isLoading || !activeProvider) return;
+    persistConversation();
+    workspace.conversations = workspace.conversations.filter((item) => item.id !== id);
+    if (id === conversationId) {
+      const next = conversationsForProject(projectKey)[0] || createConversation(projectKey, projectName, activeProvider.id, model);
+      if (!workspace.conversations.includes(next)) workspace.conversations.push(next);
+      restoreConversation(next);
+    }
+    persistConversation();
+  }
+
+  function backupStoredData() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (exportMarkdown("Conversation storage backup", raw || "No saved data.")) notice = "Stored data exported unchanged. Keep this backup before replacing it.";
+    } catch (error) { notice = String(error); }
+  }
+
+  function replaceStoredData() {
+    if (isLoading) return;
+    storageBlocked = false;
+    recoveryPending = false;
+    persistConversation();
+    if (storageError) storageBlocked = true;
+  }
+
+  function savePreset(action: ActionRecord) {
+    if (isLoading || action.status !== "succeeded") return;
+    if (workspace.presets.length >= 20) { notice = "Your 20 preset slots are full."; return; }
+    workspace.presets.push(createPreset(action.summary, action.prompt));
+    persistConversation();
+    notice = "Preset saved. Open Presets to adjust it for the next selection.";
+  }
+
+  async function usePreset(preset: CreativePreset) {
+    if (isLoading) return;
+    try {
+      const prompt = buildPresetPrompt(preset);
+      workspace.presets = workspace.presets.map((item) => item.id === preset.id ? preset : item);
+      await chatInputRef?.prefill(prompt);
+      persistConversation();
+    } catch (error) { notice = String(error); }
+  }
+
+  function makeActionRecord(script: string, summary: string, prompt: string): ActionRecord {
+    return { id: Date.now().toString(36) + Math.random().toString(36).slice(2), script, summary: summary.replace(/\s+/g, " ").slice(0, 200), prompt, status: "staged", warnings: [], errors: [], changes: [] };
+  }
+
+  function stageRecord(action: ActionRecord, root?: string) {
+    const validation = validateScript(action.script);
+    aiActionErrors = validation.errors;
+    setAiActionWarnings(validation.warnings);
+    action.errors = validation.errors.map((error) => error.message);
+    action.warnings = validation.warnings.map((warning) => warning.message);
+    const risk = scanActionRisk(action.script);
+    if (risk.risky) action.warnings.push("Review before running: this script " + risk.reasons.join(" and ") + ".");
+    stagedAction = action;
+    aiActionReady = validation.errors.length === 0;
+    if (aiActionReady) saveAiAction(root, action.script, action.summary);
+    return validation;
+  }
+
+  async function executeRecord(action: ActionRecord, root: string | undefined, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted || disposed) return false;
+    const current = await getWorkspaceContext();
+    if (signal.aborted || disposed) return false;
+    if (!current || current.projectKey !== projectKey) {
+      action.verification = "The active project could not be confirmed or has changed. Nothing was run. Refresh the project context before retrying.";
+      action.status = "staged";
+      return false;
+    }
+    const validation = stageRecord(action, root);
+    if (validation.errors.length) { action.status = "failed"; return false; }
+    action.status = "running";
+    action.changes = [];
+    action.verification = undefined;
+    persistConversation();
+    setStatus({ phase: "running_action", text: "Running AI Action..." });
+    let raw: unknown;
+    try { raw = await runAiAction(root); }
+    catch (error) { raw = { error: error instanceof Error ? error.message : String(error) }; }
+    lastActionRunResult = raw;
+    const evidence = summarizeActionResult(raw);
+    action.status = evidence.status;
+    action.changes = evidence.changes;
+    action.errors = evidence.errors;
+    lastActionResult = { summary: action.summary + (action.errors.length ? " — " + action.errors.join("; ") : ""), ranAt: Date.now(), stateDiff: evidence.changes, expressionsSet: evidence.expressionsSet };
+    if (action.errors.length) {
+      rememberError(action.errors.join("; "), evidence.errorLine);
+      logAiActionFailure({ errorKind: "runtime", errorString: action.errors.join("; "), script: action.script, injectedRecipeIds: aiActionInjectedRecipeIds, triggerPath: "manual-run", originalUserMessage: action.prompt });
+    } else rememberError("");
+    persistConversation();
+    if (workspace.verifyActions && activeProvider) {
+      action.verification = "Reviewing the execution evidence...";
+      setStatus({ phase: "thinking", text: "Reviewing action results..." });
+      action.verification = await reviewActionResult(action, activeProvider, model, signal);
+    }
+    persistConversation();
+    setStatus({ phase: evidence.status === "failed" ? "error" : "completed", text: evidence.status === "succeeded" ? "Action complete — changes detected." : evidence.status === "failed" ? "Action needs attention." : "Action finished — result inconclusive.", terminal: true });
+    return evidence.status !== "failed";
+  }
+
+  async function runStoredAction(action: ActionRecord): Promise<boolean> {
+    if (isLoading) return false;
+    isLoading = true;
+    const controller = new AbortController();
+    activeAbortController = controller;
+    startStatusTimer();
+    try {
+      const context = await buildContext();
+      if (controller.signal.aborted || disposed) return false;
+      if (context.projectKey !== projectKey) {
+        notice = "The active AE project changed. Open its conversation before running an action.";
+        return false;
+      }
+      sessionProjectRoot = context.projectRoot;
+      aiActionOriginalUserMessage = action.prompt;
+      return await executeRecord(action, context.projectRoot, controller.signal);
+    } catch (error) {
+      action.status = "failed";
+      action.errors = [error instanceof Error ? error.message : String(error)];
+      return false;
+    } finally {
+      isLoading = false;
+      activeAbortController = null;
+      persistConversation();
+      clearStatusSoon();
+    }
   }
 
   function cancelStatusClear() {
@@ -345,26 +606,17 @@
   }
 
   function handleProviderSelect(provider: ProviderDefinition) {
+    if (isLoading) return;
+    persistConversation();
     activeProvider = provider;
-    model = provider.models[0]?.value || "";
-    localStorage.setItem("selectedProviderId", provider.id);
+    const preferred = workspace.models[provider.id];
+    model = provider.models.find((item) => item.value === preferred)?.value || provider.models[0]?.value || "";
     sessionId = undefined;
-    messages = [];
     rememberError("");
     pendingScreenshot = null;
-    aiActionReady = false;
-    aiActionInjectedRecipeIds = [];
-    aiActionOriginalUserMessage = "";
-    setAiActionWarnings([]);
-    setStatus(null);
-    autoFixAttempt = 0;
-    autoFixOriginalPrompt = "";
-    autoFixAborted = false;
-    pendingContexts = [];
-    addMessage(
-      "system",
-      provider.displayName + " ready. Ask about your After Effects project."
-    );
+    try { localStorage.setItem("selectedProviderId", provider.id); } catch {}
+    if (!conversationId) newConversation();
+    persistConversation();
   }
 
   function contextKey(ctx: ContextChip): string {
@@ -420,6 +672,7 @@
     pinned?: ContextChip[],
     mode?: ChatMode
   ) {
+    if (isLoading) return;
     autoFixAttempt = 0;
     autoFixOriginalPrompt = text;
     autoFixAborted = false;
@@ -445,10 +698,6 @@
     tutorialViewerOpen = false;
     setAiActionWarnings([]);
     aiActionErrors = [];
-    const history = messages.slice();
-    if (!isAutoFix) {
-      addMessage("user", text);
-    }
     isLoading = true;
     const imagePath = pendingScreenshot?.path;
     pendingScreenshot = null;
@@ -472,8 +721,21 @@
         lastActionResult ?? undefined,
         mode
       );
+      if (controller.signal.aborted || disposed) return;
+      if (!context.snapshotAvailable) {
+        notice = "Could not read the AE project. Your prompt is still in the composer; try again when AE is ready.";
+        if (!isAutoFix) draft = text;
+        return;
+      }
+      if (isAutoFix && context.projectKey !== projectKey) {
+        notice = "The AE project changed. Automatic repair stopped.";
+        return;
+      }
+      if (!isAutoFix) syncProject(context);
+      const history = messages.slice();
+      if (!isAutoFix) addMessage("user", text);
       lastActionResult = null;
-      sessionProjectRoot = context.projectRoot || sessionProjectRoot;
+      sessionProjectRoot = context.projectRoot;
 
       if (!didInitializeAiAction && sessionProjectRoot) {
         clearAiAction(sessionProjectRoot);
@@ -493,6 +755,7 @@
           projectRoot: context.projectRoot,
           signal: controller.signal,
           onChunk: (chunk) => {
+            if (controller.signal.aborted || disposed) return;
             if (streamingIdx === -1) {
               streamingIdx = addMessage("assistant", chunk);
             } else {
@@ -500,12 +763,15 @@
             }
           },
           onStatus: (status) => {
+            if (controller.signal.aborted || disposed) return;
             setStatus(status);
           },
         },
         history
       );
       providerCallInFlight = false;
+
+      if (controller.signal.aborted || disposed) return;
 
       if (result.sessionId) {
         sessionId = result.sessionId;
@@ -532,15 +798,17 @@
         const storedContent = tutorial
           ? displayText + "\n\n" + outlineForHistory(tutorial)
           : displayText;
+        let responseIndex: number;
 
         if (streamingIdx !== -1) {
+          responseIndex = streamingIdx;
           // Update the streamed message with the cleaned display text and duration
           messages[streamingIdx].content = storedContent;
           messages[streamingIdx].duration_ms = result.duration_ms;
           messages[streamingIdx].tutorial = tutorial;
           streamingIdx = -1;
         } else {
-          addMessage("assistant", storedContent, {
+          responseIndex = addMessage("assistant", storedContent, {
             duration_ms: result.duration_ms,
             tutorial,
           });
@@ -563,173 +831,22 @@
         }
 
         if (parsed.scriptContent) {
-          const validationErrors = parsed.validation?.errors || [];
-          const warnings = parsed.validation?.warnings || [];
-          setAiActionWarnings(warnings);
-
-          setStatus({
-            phase: "saving_action",
-            text: "Saving AI Action...",
-          });
-          const saved = saveAiAction(context.projectRoot, parsed.scriptContent, displayText);
+          messages[responseIndex].action = makeActionRecord(parsed.scriptContent, displayText, autoFixOriginalPrompt || text);
+          const action = messages[responseIndex].action!;
           aiActionInjectedRecipeIds = context.diagnostics.recipeIds.slice();
-          aiActionOriginalUserMessage = autoFixOriginalPrompt || text;
-          addMessage("system", "AI Action ready: " + saved.summary);
-
-          if (validationErrors.length > 0) {
-            aiActionReady = false;
-            aiActionErrors = validationErrors;
-            addMessage(
-              "system",
-              "AI Action blocked by validation errors:\n" +
-                validationErrors.map((e) => `  [${e.code}] ${e.message}`).join("\n")
-            );
-            setStatus({
-              phase: "error",
-              text: "AI Action blocked — validation errors.",
-              terminal: true,
-            });
-            rememberError(validationErrors.map((e) => e.message).join("; "), null);
-            await triggerAutoFix(
-              validationErrors.map((e) => e.message).join("; "),
-              null,
-              parsed.scriptContent,
-              [],
-              validationErrors,
-              [],
-              {
-                errorKind: "validation",
-                injectedRecipeIds: context.diagnostics.recipeIds,
-              }
-            );
+          aiActionOriginalUserMessage = action.prompt;
+          const validation = stageRecord(action, context.projectRoot);
+          if (validation.errors.length) {
+            action.status = "failed";
+            rememberError(action.errors.join("; "));
+            await triggerAutoFix(action.errors.join("; "), null, action.script, [], validation.errors, [], { errorKind: "validation", injectedRecipeIds: context.diagnostics.recipeIds });
+          } else if (parsed.runImmediately && !action.warnings.length && !controller.signal.aborted) {
+            const ok = await executeRecord(action, context.projectRoot, controller.signal);
+            if (!ok && !workspace.verifyActions) {
+              await triggerAutoFix(action.errors.join("; "), lastErrorLine, action.script, [], [], [], { errorKind: "runtime", injectedRecipeIds: context.diagnostics.recipeIds });
+            }
           } else {
-            aiActionReady = true;
-            if (warnings.length > 0) {
-              addMessage(
-                "system",
-                warnings.map((warning) => warning.message).join("\n")
-              );
-            }
-
-            if (parsed.runImmediately) {
-              if (warnings.length > 0) {
-                setStatus({
-                  phase: "completed",
-                  text: "AI Action saved with validation warnings.",
-                  terminal: true,
-                });
-                addMessage(
-                  "system",
-                  "AI Action was not run automatically. Review the warnings, click AI Action to run anyway, or ask the assistant to fix the script."
-                );
-                rememberError(warnings.map((w) => w.message).join("; "), null);
-                await triggerAutoFix(
-                  warnings.map((w) => w.message).join("; "),
-                  null,
-                  parsed.scriptContent,
-                  [],
-                  [],
-                  warnings,
-                  {
-                    errorKind: "warning",
-                    injectedRecipeIds: context.diagnostics.recipeIds,
-                  }
-                );
-              } else if (scanActionRisk(parsed.scriptContent).risky) {
-                const risk = scanActionRisk(parsed.scriptContent);
-                setStatus({
-                  phase: "completed",
-                  text: "AI Action needs your confirmation.",
-                  terminal: true,
-                });
-                addMessage(
-                  "system",
-                  "This AI Action was not run automatically because it " +
-                    risk.reasons.join(" and ") +
-                    ". Review the script, then click AI Action to run it."
-                );
-              } else {
-                setStatus({
-                  phase: "running_action",
-                  text: "Running AI Action...",
-                });
-                const runResult = await runAiAction(context.projectRoot);
-                lastActionRunResult = runResult;
-                const exprErrors: ExpressionError[] =
-                  (runResult as any)?.expressionErrors || [];
-
-                if (runResult && "error" in runResult && runResult.error) {
-                  const errorStr = String(runResult.error);
-                  const errorLine =
-                    typeof runResult.errorLine === "number" ? runResult.errorLine : null;
-                  setStatus({
-                    phase: "error",
-                    text: "AI Action failed.",
-                    raw: errorStr,
-                    terminal: true,
-                  });
-                  addMessage("system", "AI Action failed: " + errorStr);
-                  rememberError(errorStr, errorLine);
-                  await triggerAutoFix(
-                    errorStr,
-                    errorLine,
-                    parsed.scriptContent,
-                    exprErrors,
-                    [],
-                    [],
-                    {
-                      errorKind: "runtime",
-                      injectedRecipeIds: context.diagnostics.recipeIds,
-                    }
-                  );
-                } else if (exprErrors.length > 0) {
-                  const exprSummary = exprErrors
-                    .map(
-                      (e) =>
-                        `prop "${e.name || "?"}" line ${e.line}: ${e.error}`
-                    )
-                    .join("; ");
-                  setStatus({
-                    phase: "error",
-                    text: "AI Action ran with expression errors.",
-                    terminal: true,
-                  });
-                  addMessage("system", "AI Action ran but expression errors occurred:\n" +
-                    exprErrors.map((e) =>
-                      `  prop "${e.name || "?"}" line ${e.line}: ${e.error}` +
-                      (e.expr ? `\n    expr: "${e.expr}"` : "")
-                    ).join("\n")
-                  );
-                  rememberError(exprSummary, null);
-                  await triggerAutoFix(
-                    exprSummary,
-                    null,
-                    parsed.scriptContent,
-                    exprErrors,
-                    [],
-                    [],
-                    {
-                      errorKind: "expression",
-                      injectedRecipeIds: context.diagnostics.recipeIds,
-                    }
-                  );
-                } else {
-                  const stateDiff = recordActionSuccess(runResult, saved.summary);
-                  setStatus({
-                    phase: "completed",
-                    text: "AI Action executed successfully.",
-                    terminal: true,
-                  });
-                  addMessage("system", formatRunSuccessMessage(stateDiff));
-                }
-              }
-            } else {
-              setStatus({
-                phase: "completed",
-                text: "AI Action ready.",
-                terminal: true,
-              });
-            }
+            setStatus({ phase: "completed", text: "Action staged. Review the script and choose Run.", terminal: true });
           }
         }
       }
@@ -739,7 +856,9 @@
       providerCallInFlight = false;
       if (streamingIdx !== -1) {
         messages.splice(streamingIdx, 1);
+        streamingIdx = -1;
       }
+      if (controller.signal.aborted || disposed) return;
       setStatus({
         phase: "error",
         text: "Unexpected panel error.",
@@ -752,8 +871,14 @@
       });
       rememberError(errMsg);
     } finally {
+      if (controller.signal.aborted) {
+        if (streamingIdx !== -1) messages.splice(streamingIdx, 1);
+        sessionId = undefined;
+        setStatus({ phase: "cancelled", text: "Request cancelled.", terminal: true });
+      }
       isLoading = false;
       activeAbortController = null;
+      persistConversation();
       clearStatusSoon();
     }
   }
@@ -785,113 +910,19 @@
     }
   }
 
-  async function handleTutorialStepRun(
-    action: TutorialStepAction
-  ): Promise<boolean> {
-    const validationErrors = action.validation.errors;
-    if (validationErrors.length > 0) {
-      addMessage(
-        "system",
-        "Tutorial step blocked by validation errors:\n" +
-          validationErrors.map((error) => `  [${error.code}] ${error.message}`).join("\n")
-      );
-      return false;
-    }
-
-    try {
-      if (!sessionProjectRoot) {
-        const context = await buildContext();
-        sessionProjectRoot = context.projectRoot || sessionProjectRoot;
-      }
-
-      const summary = `Tutorial step ${action.index + 1}: ${action.label}`;
-      const saved = saveAiAction(sessionProjectRoot, action.script, summary);
-      aiActionReady = true;
-      aiActionErrors = [];
-      setAiActionWarnings(action.validation.warnings);
-
-      if (action.validation.warnings.length > 0) {
-        addMessage(
-          "system",
-          "Running tutorial step despite validation warnings:\n" +
-            action.validation.warnings.map((warning) => warning.message).join("\n")
-        );
-      }
-
-      const runResult = await runAiAction(sessionProjectRoot);
-      lastActionRunResult = runResult;
-      const exprErrors: ExpressionError[] = (runResult as any)?.expressionErrors || [];
-
-      if (runResult && "error" in runResult && runResult.error) {
-        const errorStr = String(runResult.error);
-        addMessage("system", "Tutorial step failed: " + errorStr);
-        rememberError(
-          errorStr,
-          typeof runResult.errorLine === "number" ? runResult.errorLine : null
-        );
-        logAiActionFailure({
-          errorKind: "runtime",
-          errorString: errorStr,
-          script: action.script,
-          expressionErrors: exprErrors,
-          injectedRecipeIds: aiActionInjectedRecipeIds,
-          triggerPath: "manual-run",
-          originalUserMessage: aiActionOriginalUserMessage,
-        });
-        return false;
-      }
-
-      if (exprErrors.length > 0) {
-        const exprSummary = exprErrors
-          .map((error) =>
-            `prop "${error.name || "?"}" line ${error.line}: ${error.error}`
-          )
-          .join("; ");
-        addMessage(
-          "system",
-          "Tutorial step ran but expression errors occurred:\n" +
-            exprErrors.map((error) =>
-              `  prop "${error.name || "?"}" line ${error.line}: ${error.error}` +
-              (error.expr ? `\n    expr: "${error.expr}"` : "")
-            ).join("\n")
-        );
-        rememberError(exprSummary, null);
-        logAiActionFailure({
-          errorKind: "expression",
-          errorString: exprSummary,
-          script: action.script,
-          expressionErrors: exprErrors,
-          injectedRecipeIds: aiActionInjectedRecipeIds,
-          triggerPath: "manual-run",
-          originalUserMessage: aiActionOriginalUserMessage,
-        });
-        return false;
-      }
-
-      setAiActionWarnings([]);
-      const stateDiff = recordActionSuccess(runResult, saved.summary);
-      addMessage("system", formatRunSuccessMessage(stateDiff));
-      return true;
-    } catch (err: any) {
-      const errMsg = err?.message || String(err);
-      addMessage("system", "Tutorial step unavailable: " + errMsg);
-      rememberError(errMsg);
-      logAiActionFailure({
-        errorKind: "runtime",
-        errorString: errMsg,
-        script: action.script,
-        injectedRecipeIds: aiActionInjectedRecipeIds,
-        triggerPath: "manual-run",
-        originalUserMessage: aiActionOriginalUserMessage,
-      });
-      return false;
-    }
+  async function handleTutorialStepRun(action: TutorialStepAction): Promise<boolean> {
+    if (isLoading) return false;
+    const summary = `Tutorial step ${action.index + 1}: ${action.label}`;
+    const index = addMessage("assistant", summary);
+    messages[index].action = makeActionRecord(action.script, summary, aiActionOriginalUserMessage || summary);
+    return runStoredAction(messages[index].action!);
   }
 
   async function handleAction(
     action: { label: string; prompt?: string; handler?: string },
     event?: MouseEvent
   ) {
+    if (isLoading) return;
     if (action.handler === "startTutorial") {
       await chatInputRef?.prefill("/tutorial ");
       return;
@@ -969,88 +1000,8 @@
         return;
       }
 
-      let manualScript: string | null = null;
-      try {
-        if (!sessionProjectRoot) {
-          const context = await buildContext();
-          sessionProjectRoot = context.projectRoot || sessionProjectRoot;
-        }
-
-        if (aiActionErrors.length > 0) {
-          addMessage(
-            "system",
-            "AI Action is blocked by validation errors. Ask the assistant to fix the script first."
-          );
-          return;
-        }
-
-        if (aiActionWarnings.length > 0) {
-          addMessage("system", "Running AI Action despite validation warnings.");
-        }
-
-        manualScript = readAiActionScript(sessionProjectRoot);
-        const runResult = await runAiAction(sessionProjectRoot);
-        lastActionRunResult = runResult;
-        const exprErrors: ExpressionError[] = (runResult as any)?.expressionErrors || [];
-
-        if (runResult && "error" in runResult && runResult.error) {
-          const errorStr = String(runResult.error);
-          addMessage("system", "AI Action failed: " + errorStr);
-          rememberError(
-            errorStr,
-            typeof runResult.errorLine === "number" ? runResult.errorLine : null
-          );
-          logAiActionFailure({
-            errorKind: "runtime",
-            errorString: errorStr,
-            script: manualScript,
-            expressionErrors: exprErrors,
-            injectedRecipeIds: aiActionInjectedRecipeIds,
-            triggerPath: "manual-run",
-            originalUserMessage: aiActionOriginalUserMessage,
-          });
-        } else if (exprErrors.length > 0) {
-          const exprSummary = exprErrors
-            .map((e) => `prop "${e.name || "?"}" line ${e.line}: ${e.error}`)
-            .join("; ");
-          addMessage("system", "AI Action ran but expression errors occurred:\n" +
-            exprErrors.map((e) =>
-              `  prop "${e.name || "?"}" line ${e.line}: ${e.error}` +
-              (e.expr ? `\n    expr: "${e.expr}"` : "")
-            ).join("\n")
-          );
-          rememberError(exprSummary, null);
-          logAiActionFailure({
-            errorKind: "expression",
-            errorString: exprSummary,
-            script: manualScript,
-            expressionErrors: exprErrors,
-            injectedRecipeIds: aiActionInjectedRecipeIds,
-            triggerPath: "manual-run",
-            originalUserMessage: aiActionOriginalUserMessage,
-          });
-        } else {
-          setAiActionWarnings([]);
-          aiActionErrors = [];
-          const stateDiff = recordActionSuccess(
-            runResult,
-            "Manual run of the saved AI Action"
-          );
-          addMessage("system", formatRunSuccessMessage(stateDiff));
-        }
-      } catch (err: any) {
-        const errMsg = err?.message || String(err);
-        addMessage("system", "AI Action unavailable: " + errMsg);
-        rememberError(errMsg);
-        logAiActionFailure({
-          errorKind: "runtime",
-          errorString: errMsg,
-          script: manualScript,
-          injectedRecipeIds: aiActionInjectedRecipeIds,
-          triggerPath: "manual-run",
-          originalUserMessage: aiActionOriginalUserMessage,
-        });
-      }
+      if (stagedAction) await runStoredAction(stagedAction);
+      else notice = "Choose Run on an action card to run a saved script.";
       return;
     }
 
@@ -1060,7 +1011,6 @@
   }
 
   onMount(() => {
-    let disposed = false;
     let uninstallTestHarness: (() => void) | null = null;
 
     // Static (not dynamic) import: CEF cannot fetch a split chunk via import()
@@ -1080,36 +1030,54 @@
       });
     }
 
-    const lastProviderId = localStorage.getItem("selectedProviderId");
-    if (lastProviderId) {
-      const provider = providerRegistry.find((p) => p.id === lastProviderId);
-      if (provider) {
-        provider.isAvailable().then((availability) => {
-          if (availability.available && !disposed) {
-            handleProviderSelect(provider);
-          }
-        });
+    void (async () => {
+      let lastProviderId: string | null = null;
+      try {
+        const loaded = loadWorkspace(localStorage);
+        workspace = loaded.state;
+        storageError = loaded.error || "";
+        storageBlocked = Boolean(loaded.error);
+        lastProviderId = localStorage.getItem("selectedProviderId");
+      } catch {
+        storageBlocked = true;
+        storageError = "Conversation storage is unavailable. Export your chat before closing.";
       }
-    }
-
-    buildContext()
-      .then((context) => {
+      const context = await getWorkspaceContext();
+      if (disposed) return;
+      if (context) { projectKey = context.projectKey; projectName = context.projectName; selection = context.selection; }
+      const candidates = conversationsForProject(projectKey);
+      const saved = candidates.find((item) => item.id === workspace.activeConversationId) || candidates[0];
+      const provider = providerRegistry.find((item) => item.id === (saved?.providerId || lastProviderId));
+      if (provider) {
+        const availability = await provider.isAvailable();
         if (disposed) return;
-        sessionProjectRoot = context.projectRoot || sessionProjectRoot;
-        if (!didInitializeAiAction && context.projectRoot) {
-          clearAiAction(context.projectRoot);
-          aiActionReady = false;
-          didInitializeAiAction = true;
+        if (availability.available) {
+          activeProvider = provider;
+          if (saved) restoreConversation(saved);
+          else model = provider.models.find((item) => item.value === workspace.models[provider.id])?.value || provider.models[0]?.value || "";
         }
-      })
-      .catch(() => {});
+      }
+      workspaceLoaded = true;
+      if (activeProvider && !conversationId) newConversation();
+    })().catch(() => { if (!disposed) workspaceLoaded = true; });
+
+    const onVisibility = () => { if (document.hidden) persistConversation(); else void refreshWorkspaceContext(); };
+    window.addEventListener("focus", refreshWorkspaceContext);
+    window.addEventListener("beforeunload", persistConversation);
+    document.addEventListener("visibilitychange", onVisibility);
 
     checkForUpdate(version).then((update) => {
       if (!disposed) availableUpdate = update;
     });
 
     return () => {
+      persistConversation();
       disposed = true;
+      activeAbortController?.abort();
+      if (saveTimer) clearTimeout(saveTimer);
+      window.removeEventListener("focus", refreshWorkspaceContext);
+      window.removeEventListener("beforeunload", persistConversation);
+      document.removeEventListener("visibilitychange", onVisibility);
       uninstallTestHarness?.();
       cancelStatusClear();
       stopStatusTimer();
@@ -1120,7 +1088,9 @@
   });
 </script>
 
-{#if !activeProvider}
+{#if !workspaceLoaded}
+  <p class="workspace-notice">Opening your workspace...</p>
+{:else if !activeProvider}
   <ProviderPicker onSelect={handleProviderSelect} />
 {:else}
   <div class="app">
@@ -1131,9 +1101,42 @@
       {version}
       {model}
       disabled={isLoading}
-      onModelChange={(value) => (model = value)}
+      onModelChange={changeModel}
       onProviderChange={handleProviderSelect}
     />
+
+    <WorkspaceBar
+      conversations={projectConversations}
+      allConversations={workspace.conversations}
+      currentId={conversationId}
+      {projectName}
+      presets={workspace.presets}
+      disabled={isLoading}
+      verifyActions={workspace.verifyActions}
+      reviewAvailable={Boolean(activeProvider.reviewAction)}
+      onselect={selectConversation}
+      onnew={newConversation}
+      oncopy={copyConversation}
+      onexport={exportConversation}
+      onremove={removeConversation}
+      onverify={(value) => { workspace.verifyActions = value; persistConversation(); }}
+      onpreset={usePreset}
+    />
+    {#if storageError}
+      <div class="workspace-notice workspace-notice--warning" role="alert">
+        {storageError}
+        {#if storageBlocked}
+          <button type="button" onclick={backupStoredData}>Back up saved data</button>
+          <button type="button" disabled={isLoading} onclick={() => (recoveryPending = !recoveryPending)}>Replace saved data</button>
+          {#if recoveryPending}
+            <p>This replaces unreadable saved data with the chats currently open in this panel. Export a backup first.</p>
+            <button type="button" disabled={isLoading} onclick={replaceStoredData}>Confirm replacement</button>
+            <button type="button" onclick={() => (recoveryPending = false)}>Cancel</button>
+          {/if}
+        {/if}
+      </div>
+    {/if}
+    {#if notice}<div class="workspace-notice" role="status">{notice}<button type="button" aria-label="Dismiss notice" onclick={() => (notice = "")}>×</button></div>{/if}
 
     {#if availableUpdate}
       <UpdateBanner
@@ -1170,6 +1173,9 @@
               : undefined}
           />
         {/if}
+        {#if msg.action}
+          <ActionCard action={msg.action} disabled={isLoading} onrun={() => { if (msg.action) void runStoredAction(msg.action); }} onsave={() => { if (msg.action) savePreset(msg.action); }} />
+        {/if}
       {/each}
 
       {#if isLoading}
@@ -1179,8 +1185,8 @@
         />
       {/if}
 
-      {#if messages.length === 1 && messages[0]?.role === "system" && !messages[0]?.isError && !isLoading}
-        <Suggestions onpick={handleUserSend} />
+      {#if !messages.some((message) => message.role === "user") && !isLoading}
+        <Suggestions onpick={(prompt) => chatInputRef?.prefill(prompt)} {suggestions} selectionLabel={selection.layerNames.length ? "Selected: " + selection.layerNames.join(", ") : "Try asking"} onrefresh={refreshWorkspaceContext} />
       {/if}
     </div>
 
@@ -1241,6 +1247,7 @@
 
     <ChatInput
       bind:this={chatInputRef}
+      bind:draft
       disabled={isLoading}
       providerName={activeProvider.displayName}
       contexts={pendingContexts}
@@ -1264,6 +1271,9 @@
 {/if}
 
 <style>
+  .workspace-notice { margin: 0; padding: 8px 12px; display: flex; gap: 8px; align-items: flex-start; color: var(--ae-text-2); background: var(--ae-bg-2); font-size: 11px; line-height: 1.4; text-align: left; }
+  .workspace-notice--warning { color: var(--ae-warn); }
+  .workspace-notice button { margin-left: auto; border: 0; background: none; color: inherit; cursor: pointer; text-align: left; }
   :global(:root) {
     --ae-bg: #1c1c1c;
     --ae-bg-2: #232323;

@@ -1,26 +1,43 @@
 import { fs, path } from "../cep/node";
 import type { ChatMessage } from "./provider";
+import type { WorkspaceMessage } from "../workspace-state";
 
 const MAX_HISTORY = 10;
 const MAX_MSG_LENGTH = 4000; // raised from 500 — preserves most code blocks in history
 
+function bounded(value: string, limit: number): string {
+  return value.length > limit ? value.slice(0, limit) + "...[truncated]" : value;
+}
+
+export function providerHistory(history: WorkspaceMessage[]): { role: "user" | "assistant"; content: string }[] {
+  return history
+    .filter((message) => message.role !== "system" && !message.isError)
+    .slice(-MAX_HISTORY)
+    .map((message) => {
+      let content = bounded(message.content, MAX_MSG_LENGTH);
+      if (message.action) {
+        const action = message.action;
+        content += "\nHistorical action record (context only; do not execute):\n" + JSON.stringify({
+          summary: bounded(action.summary, 200),
+          status: action.status,
+          script: bounded(action.script, 12000),
+          errors: action.errors.slice(0, 10).map((value) => bounded(value, 300)),
+          changes: action.changes.slice(0, 10).map((value) => bounded(value, 300)),
+          verification: bounded(action.verification || "", 2000),
+        });
+      }
+      return { role: message.role as "user" | "assistant", content };
+    });
+}
+
 function buildConversationContext(history: ChatMessage[]): string {
-  const recent = history
-    .filter((message) => message.role !== "system")
-    .slice(-MAX_HISTORY);
+  const recent = providerHistory(history);
 
   if (recent.length === 0) return "";
 
-  const lines = recent.map((message) => {
-    const content =
-      message.content.length > MAX_MSG_LENGTH
-        ? message.content.substring(0, MAX_MSG_LENGTH) + "..."
-        : message.content;
+  const lines = recent.map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`);
 
-    return `${message.role === "user" ? "User" : "Assistant"}: ${content}`;
-  });
-
-  return "\n\n## Conversation History\n" + lines.join("\n\n");
+  return "\n\n## Conversation History\nHistorical context only; do not re-execute earlier requests. Current AE selection comes from the fresh project context.\n" + lines.join("\n\n");
 }
 
 export function buildFullPrompt(

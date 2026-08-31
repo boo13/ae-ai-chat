@@ -5,6 +5,7 @@
   import type { ContextChip } from "../../shared/shared";
 
   interface Props {
+    draft?: string;
     disabled: boolean;
     providerName: string;
     onsubmit: (text: string) => void;
@@ -15,6 +16,7 @@
   }
 
   let {
+    draft = $bindable(""),
     disabled,
     providerName,
     onsubmit,
@@ -23,7 +25,7 @@
     onContextAdd,
     onContextRemove,
   }: Props = $props();
-  let text: string = $state("");
+  const text = $derived(draft);
   let textareaEl: HTMLTextAreaElement | undefined = $state();
   let pickerOpen = $state(false);
   let contextMenuEl: HTMLDivElement | undefined = $state();
@@ -68,7 +70,7 @@
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
     onsubmit(trimmed);
-    text = "";
+    draft = "";
     if (textareaEl) {
       textareaEl.style.height = "auto";
     }
@@ -82,7 +84,7 @@
   }
 
   export async function prefill(value: string) {
-    text = value;
+    draft = value;
     await tick();
     if (!textareaEl) return;
     textareaEl.focus();
@@ -120,11 +122,13 @@
 
     <textarea
       bind:this={textareaEl}
-      bind:value={text}
+      bind:value={draft}
       onkeydown={handleKeydown}
       oninput={autoResize}
       {placeholder}
       rows="1"
+      aria-label="Message"
+      maxlength="20000"
       {disabled}
     ></textarea>
 

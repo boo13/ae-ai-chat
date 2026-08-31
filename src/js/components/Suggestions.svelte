@@ -1,20 +1,16 @@
 <script lang="ts">
   interface Props {
     onpick: (prompt: string) => void;
+    suggestions: string[];
+    selectionLabel: string;
+    onrefresh: () => void;
   }
 
-  let { onpick }: Props = $props();
-
-  const suggestions = [
-    "Describe my current comp",
-    "Create a 1920x1080 comp at 30fps",
-    "Fix the expression on selected",
-    "Generate a project report",
-  ];
+  let { onpick, suggestions, selectionLabel, onrefresh }: Props = $props();
 </script>
 
 <div class="suggestions">
-  <div class="suggestions__eyebrow">Try asking</div>
+  <div class="suggestions__eyebrow">{selectionLabel} <button class="suggestions__refresh" type="button" onclick={onrefresh}>Refresh</button></div>
   {#each suggestions as suggestion}
     <button class="suggestions__button" onclick={() => onpick(suggestion)}>
       {suggestion}
@@ -23,6 +19,7 @@
 </div>
 
 <style>
+  .suggestions__refresh { border: 0; background: none; color: var(--accent); font: inherit; font-size: 10px; cursor: pointer; text-align: left; }
   .suggestions {
     display: flex;
     flex-direction: column;
