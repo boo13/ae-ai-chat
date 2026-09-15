@@ -1,0 +1,7 @@
+{
+  "prompt": "Build a pixelate transition-out rig on the active comp: flatten all layers into one content layer, add a control layer with a Progress slider, and drive Mosaic and Block Dissolve on the content layer so it pixelates and dissolves away as Progress increases. Then run the AI Action immediately.",
+  "expectDiffContains": [
+    "Layers added"
+  ],
+  "expectNoErrors": true
+}

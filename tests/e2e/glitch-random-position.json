@@ -1,0 +1,5 @@
+{
+  "prompt": "Add a random position jitter glitch to the selected layer, then run the AI Action immediately.",
+  "expectDiffContains": ["Expressions changed"],
+  "expectNoErrors": true
+}

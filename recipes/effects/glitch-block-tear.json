@@ -1,0 +1,13 @@
+{
+  "id": "glitch-block-tear",
+  "description": "Add a control-driven block-tear glitch to every selected layer.",
+  "keywords": [
+    "block tear",
+    "datamosh",
+    "digital tear",
+    "glitch tear",
+    "pixel tear glitch"
+  ],
+  "script": "app.beginUndoGroup(\"Glitch Block Tear\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition first.\");\nif (comp.selectedLayers.length < 1) throw new Error(\"Select at least one layer.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  var layer = comp.selectedLayers[i];\n  var effects = layer.property(\"ADBE Effect Parade\");\n  var posterize = effects.addProperty(\"ADBE Posterize Time\");\n  posterize.property(\"ADBE Posterize Time-0001\").setValue(12);\n  var tear = effects.addProperty(\"ADBE Slider Control\");\n  tear.name = \"Tear Amount\";\n  tear.property(1).setValue(40);\n  var displace = effects.addProperty(\"ADBE Turbulent Displace\");\n  displace.property(\"ADBE Turbulent Displace-0001\").setValue(10);\n  displace.property(\"ADBE Turbulent Displace-0002\").expression = 'effect(\"Tear Amount\")(\"Slider\")';\n  displace.property(\"ADBE Turbulent Displace-0003\").setValue(8);\n  displace.property(\"ADBE Turbulent Displace-0005\").setValue(2);\n  displace.property(\"ADBE Turbulent Displace-0012\").setValue(3);\n  displace.property(\"ADBE Turbulent Displace-0006\").expression = \"time * 400\";\n}\napp.endUndoGroup();",
+  "notes": "\"Tear Amount\" is the one dial-in control, with a default of 40 and a practical range of about 0-100, and it drives Turbulent Displace Amount through an expression. Frame Rate 12 and Size 8 are fixed defaults tuned for a blocky tear look; edit them directly on the effect for a different fps or block size.."
+}

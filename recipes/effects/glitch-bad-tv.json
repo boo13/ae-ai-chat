@@ -1,0 +1,13 @@
+{
+  "id": "glitch-bad-tv",
+  "description": "Add a control-driven analog bad-TV glitch to every selected layer.",
+  "keywords": [
+    "bad tv",
+    "vhs glitch",
+    "analog glitch",
+    "scanline glitch",
+    "tv static glitch"
+  ],
+  "script": "app.beginUndoGroup(\"Glitch Bad TV\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition first.\");\nif (comp.selectedLayers.length < 1) throw new Error(\"Select at least one layer.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  var layer = comp.selectedLayers[i];\n  var effects = layer.property(\"ADBE Effect Parade\");\n  var wave = effects.addProperty(\"ADBE Wave Warp\");\n  wave.property(\"ADBE Wave Warp-0001\").setValue(1);\n  wave.property(\"ADBE Wave Warp-0002\").setValue(6);\n  wave.property(\"ADBE Wave Warp-0003\").setValue(120);\n  wave.property(\"ADBE Wave Warp-0004\").setValue(90);\n  wave.property(\"ADBE Wave Warp-0007\").expression = \"time * 180\";\n  var signal = effects.addProperty(\"ADBE Slider Control\");\n  signal.name = \"Signal Noise\";\n  signal.property(1).setValue(15);\n  var noise = effects.addProperty(\"ADBE Noise HLS2\");\n  noise.property(\"ADBE Noise HLS2-0001\").setValue(3);\n  noise.property(\"ADBE Noise HLS2-0003\").expression = 'effect(\"Signal Noise\")(\"Slider\")';\n  noise.property(\"ADBE Noise HLS2-0004\").setValue(5);\n  noise.property(\"ADBE Noise HLS2-0005\").setValue(1.5);\n  noise.property(\"ADBE Noise HLS2-0006\").expression = \"time * 48\";\n  var blinds = effects.addProperty(\"ADBE Venetian Blinds\");\n  blinds.property(\"ADBE Venetian Blinds-0001\").setValue(15);\n  blinds.property(\"ADBE Venetian Blinds-0002\").setValue(0);\n  blinds.property(\"ADBE Venetian Blinds-0003\").setValue(4);\n  blinds.property(\"ADBE Venetian Blinds-0004\").setValue(0);\n}\napp.endUndoGroup();",
+  "notes": "\"Signal Noise\", with a default of 15, is the dial-in control for HLS noise lightness. Wave Warp gives the rolling analog warp, and Venetian Blinds cuts thin scanline gaps; tune Transition Completion and Width, or delete that effect, if the scanlines read too strong or subtle.."
+}

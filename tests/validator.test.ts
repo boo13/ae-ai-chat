@@ -234,6 +234,24 @@ test("warns about unknown expression functions but not catalog or local function
   assert.equal(valid.length, 0);
 });
 
+test("blocks addProperty targeting a variable font axis by match-name", () => {
+  const script =
+    'var axis = animatorProps.addProperty("ADBE Text VF Axis 1");';
+  const errors = validateScript(script).errors.filter(
+    (error) => error.code === "VF_AXIS_ADD_PROPERTY"
+  );
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /addVariableFontAxis/);
+});
+
+test("does not flag the correct addVariableFontAxis API", () => {
+  const script = 'var axis = animatorProps.addVariableFontAxis("wght");';
+  const errors = validateScript(script).errors.filter(
+    (error) => error.code === "VF_AXIS_ADD_PROPERTY"
+  );
+  assert.equal(errors.length, 0);
+});
+
 test("warns when expression source uses scripting APIs only", () => {
   const inside = validateScript('prop.expression = "app.project.item(1).setValue(2);";').warnings.filter(
     (warning) => warning.code === "EXPR_SCRIPTING_API"

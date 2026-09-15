@@ -687,6 +687,33 @@ function getJustificationLabel(value: any): string {
   return String(value);
 }
 
+// AE 24.0+ exposes TextDocument.fontObject; AE 26.0+ exposes FontObject.hasDesignAxes
+// and .designAxesData (variable font axes like weight/width). Neither is in the
+// pinned AfterEffects/22.0 type defs this project builds against, so read them via
+// `as any` -- same pattern as the other forward-compat AE APIs in this file (e.g.
+// canSetExpression). Wrapped in try/catch: older AE or a non-variable font just
+// omits the field.
+function getVariableFontAxesSummary(doc: TextDocument): string {
+  try {
+    var fontObj = (doc as any).fontObject;
+    if (!fontObj) {
+      var fonts = (app as any).fonts;
+      if (fonts && fonts.getFontsByPostScriptName) {
+        var matches = fonts.getFontsByPostScriptName(doc.font);
+        if (matches && matches.length) fontObj = matches[0];
+      }
+    }
+    if (!fontObj || !fontObj.hasDesignAxes || !fontObj.designAxesData) return "";
+    var axes = fontObj.designAxesData;
+    var descs: string[] = [];
+    for (var i = 0; i < axes.length; i++) {
+      descs.push(axes[i].tag + "(" + axes[i].min + "-" + axes[i].max + ", def " + axes[i]["default"] + ")");
+    }
+    return descs.length ? "variableAxes=[" + descs.join(", ") + "]" : "";
+  } catch (e) {}
+  return "";
+}
+
 function getTextSummary(layer: Layer): string {
   if (!(layer instanceof TextLayer)) return "";
   try {
@@ -701,6 +728,8 @@ function getTextSummary(layer: Layer): string {
     try {
       if (doc.applyFill) parts.push("fill=" + stringifyValue(doc.fillColor));
     } catch (e) {}
+    var axesSummary = getVariableFontAxesSummary(doc);
+    if (axesSummary) parts.push(axesSummary);
     parts.push('text="' + truncateString(String(doc.text || "").replace(/[\r\n]+/g, " "), 60) + '"');
     return parts.join(", ");
   } catch (e) {}

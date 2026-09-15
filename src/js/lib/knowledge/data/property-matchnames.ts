@@ -14990,5 +14990,9 @@ export const PROPERTY_MATCHNAMES: Record<string, PropertyMatchNameDetail> = {
   "ADBE Text Properties": {
     "name": "Text",
     "valueType": "NO_VALUE"
+  },
+  "ADBE Text Animators": {
+    "name": "Animators",
+    "valueType": "NO_VALUE"
   }
 };

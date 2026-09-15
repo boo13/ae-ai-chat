@@ -6,8 +6,17 @@ import { close, connect, evalES, evalPanel, screenshot } from "./ae-driver.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const fixturesDir = join(root, "tests", "e2e");
-const verifyScene = readFileSync(join(root, "fixtures", "verify-scene.jsx"), "utf8");
+const sceneDir = join(root, "fixtures");
+const DEFAULT_RESET_SCRIPT = "verify-scene.jsx";
+const resetScripts = new Map();
 const failureDir = join(root, ".session", "e2e-failures");
+
+function loadResetScript(name) {
+  if (!resetScripts.has(name)) {
+    resetScripts.set(name, readFileSync(join(sceneDir, name), "utf8"));
+  }
+  return resetScripts.get(name);
+}
 
 function readFixtures() {
   return readdirSync(fixturesDir)
@@ -20,7 +29,10 @@ function readFixtures() {
         typeof fixture.prompt !== "string" ||
         fixture.expectNoErrors !== true ||
         (fixture.expectDiffContains !== undefined &&
-          !Array.isArray(fixture.expectDiffContains))
+          !Array.isArray(fixture.expectDiffContains)) ||
+        (fixture.resetScript !== undefined && typeof fixture.resetScript !== "string") ||
+        (fixture.requiresVariableFont !== undefined &&
+          typeof fixture.requiresVariableFont !== "boolean")
       ) {
         throw new Error("Invalid E2E fixture: " + path);
       }
@@ -55,11 +67,13 @@ function isProviderMissing(error) {
   );
 }
 
-async function resetFixture() {
-  const result = await evalES(verifyScene);
+async function resetFixture(fixture) {
+  const scene = loadResetScript(fixture.resetScript || DEFAULT_RESET_SCRIPT);
+  const result = await evalES(scene);
   if (!result || result.error || !result.success) {
     throw new Error("Fixture reset failed: " + String(result?.error || "unknown error"));
   }
+  return result;
 }
 
 async function main() {
@@ -88,7 +102,15 @@ async function main() {
     const rows = [];
     for (const fixture of fixtures) {
       try {
-        await resetFixture();
+        const resetResult = await resetFixture(fixture);
+        if (fixture.requiresVariableFont && !resetResult.hasVariableFont) {
+          rows.push({
+            fixture: fixture.id,
+            status: "SKIP",
+            detail: "No variable font is installed on this system",
+          });
+          continue;
+        }
         const result = await evalPanel(
           "window.__aeTest.runPrompt(" + JSON.stringify(fixture.prompt) + ")"
         );

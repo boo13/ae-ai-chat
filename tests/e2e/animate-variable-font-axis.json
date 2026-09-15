@@ -1,0 +1,9 @@
+{
+  "resetScript": "verify-scene-variable-font.jsx",
+  "requiresVariableFont": true,
+  "prompt": "Add a Text Animator to the selected text layer that animates Font Axis Weight and Font Axis Width from low values up to their current value, then run the AI Action immediately.",
+  "expectDiffContains": [
+    "Keyframes changed"
+  ],
+  "expectNoErrors": true
+}

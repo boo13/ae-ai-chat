@@ -57,6 +57,11 @@ export const VALIDATOR_REJECTIONS: Array<{ code: string; description: string }> 
     description:
       'literal setValue() outside a verified 0-1 range — some percent-styled sliders (e.g. CC Toner "Blend w. Original") take fractions: write 65% as 0.65',
   },
+  {
+    code: "VF_AXIS_ADD_PROPERTY",
+    description:
+      'addProperty("ADBE Text VF Axis N") — variable font axes cannot be added by match-name; use animatorProps.addVariableFontAxis("wght"|"wdth"|"slnt"|"ital"|"opsz") (AE 26.0+)',
+  },
 ];
 
 // ExtendScript globals the model commonly misspells. The bad form is always a
@@ -775,6 +780,32 @@ const FRACTION_RANGE_PROPS: Record<string, { label: string; limit: number; hint:
   },
 };
 
+// Variable font axes (ADBE Text VF Axis 1-8) are display-only slots in the
+// property tree — AE throws "Can not add a property with name ... to this
+// PropertyGroup" if addProperty() targets them directly. The only valid way
+// to create one is PropertyGroup.addVariableFontAxis(tag) (AE 26.0+). Block
+// the invalid pattern here rather than let the model discover it at runtime.
+const VF_AXIS_ADD_PROPERTY_REGEX = /\.addProperty\(\s*(['"])(ADBE Text VF Axis \d+)\1\s*\)/g;
+
+function checkVariableFontAxisAddProperty(content: string): ScriptValidationError[] {
+  const scanText = commentsBlankedView(content);
+  const occurrences: ScriptValidationOccurrence[] = [];
+  let match: RegExpExecArray | null;
+  VF_AXIS_ADD_PROPERTY_REGEX.lastIndex = 0;
+  while ((match = VF_AXIS_ADD_PROPERTY_REGEX.exec(scanText)) !== null) {
+    occurrences.push(getLineColumn(content, match.index));
+  }
+  if (occurrences.length === 0) return [];
+  return [
+    {
+      code: "VF_AXIS_ADD_PROPERTY",
+      message:
+        'Variable font axes cannot be added via addProperty("ADBE Text VF Axis N") — AE throws "Can not add a property with name ... to this PropertyGroup." Use animatorProps.addVariableFontAxis("wght"|"wdth"|"slnt"|"ital"|"opsz") instead (AE 26.0+).',
+      occurrences,
+    },
+  ];
+}
+
 function checkSetValueRange(content: string): ScriptValidationError[] {
   const errors: ScriptValidationError[] = [];
   const scanText = commentsBlankedView(content);
@@ -805,6 +836,7 @@ export function validateScript(content: string): ScriptValidationResult {
     ...checkUndoGroupBalance(codeOnly),
     ...checkSetValueArity(content),
     ...checkSetValueRange(content),
+    ...checkVariableFontAxisAddProperty(content),
   ];
 
   const warnings: ScriptValidationWarning[] = [

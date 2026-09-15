@@ -886,6 +886,7 @@ for (const [matchName, name, valueType] of [
   ["ADBE Root Vectors Group", "Contents", "NO_VALUE"],
   ["ADBE Text Properties", "Text", "NO_VALUE"],
   ["ADBE Text Document", "Source Text", "TEXT_DOCUMENT"],
+  ["ADBE Text Animators", "Animators", "NO_VALUE"],
 ]) {
   addPropertyMatchName(matchName, name, valueType);
 }

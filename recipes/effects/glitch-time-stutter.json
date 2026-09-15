@@ -1,0 +1,13 @@
+{
+  "id": "glitch-time-stutter",
+  "description": "Add a control-driven time-stutter and echo-trail glitch to every selected layer.",
+  "keywords": [
+    "time stutter",
+    "strobe glitch",
+    "frame stutter",
+    "echo trail glitch",
+    "choppy framerate"
+  ],
+  "script": "app.beginUndoGroup(\"Glitch Time Stutter\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition first.\");\nif (comp.selectedLayers.length < 1) throw new Error(\"Select at least one layer.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  var layer = comp.selectedLayers[i];\n  var effects = layer.property(\"ADBE Effect Parade\");\n  var stutter = effects.addProperty(\"ADBE Slider Control\");\n  stutter.name = \"Stutter FPS\";\n  stutter.property(1).setValue(8);\n  var posterize = effects.addProperty(\"ADBE Posterize Time\");\n  posterize.property(\"ADBE Posterize Time-0001\").expression = 'effect(\"Stutter FPS\")(\"Slider\")';\n  var echo = effects.addProperty(\"ADBE Echo\");\n  echo.property(\"ADBE Echo-0001\").setValue(-0.05);\n  echo.property(\"ADBE Echo-0002\").setValue(4);\n  echo.property(\"ADBE Echo-0003\").setValue(1);\n  echo.property(\"ADBE Echo-0004\").setValue(0.6);\n  echo.property(\"ADBE Echo-0005\").setValue(4);\n}\napp.endUndoGroup();",
+  "notes": "\"Stutter FPS\", with a default of 8, is the dial-in control for how choppy the frame rate reads. Echo adds 4 ghost-trail repeats decaying at 0.6 and screen-blended. Lower Stutter FPS is choppier.."
+}

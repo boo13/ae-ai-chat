@@ -1,0 +1,13 @@
+{
+  "id": "glitch-random-position",
+  "description": "Add intermittent control-driven position jumps to every selected layer.",
+  "keywords": [
+    "random position glitch",
+    "position jitter",
+    "jitter glitch",
+    "random jump glitch",
+    "position stutter"
+  ],
+  "script": "app.beginUndoGroup(\"Glitch Random Position\");\nvar comp = app.project.activeItem;\nif (!(comp instanceof CompItem)) throw new Error(\"Open a composition first.\");\nif (comp.selectedLayers.length < 1) throw new Error(\"Select at least one layer.\");\nfor (var i = 0; i < comp.selectedLayers.length; i++) {\n  var layer = comp.selectedLayers[i];\n  var effects = layer.property(\"ADBE Effect Parade\");\n  var jitter = effects.addProperty(\"ADBE Slider Control\");\n  jitter.name = \"Jitter\";\n  jitter.property(1).setValue(24);\n  var position = layer.property(\"ADBE Transform Group\").property(\"ADBE Position\");\n  position.expression = 'seedRandom(index, true);\\n' +\n    'posterizeTime(12);\\n' +\n    'var amp = effect(\"Jitter\")(\"Slider\");\\n' +\n    'var p = value;\\n' +\n    'if (random() > 0.65) {\\n' +\n    '  var nx = p[0] + random(-amp, amp);\\n' +\n    '  var ny = p[1] + random(-amp, amp);\\n' +\n    '  p.length > 2 ? [nx, ny, p[2]] : [nx, ny];\\n' +\n    '} else {\\n' +\n    '  value;\\n' +\n    '}';\n}\napp.endUndoGroup();",
+  "notes": "\"Jitter\", with a default of 24px, controls the maximum random offset per jump. The expression gates jumps to happen only about 35% of the time with random() > 0.65 through posterizeTime(12), so it reads as intermittent snaps rather than continuous shake, not a smooth wiggle.."
+}
