@@ -33,16 +33,16 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.55.0",
-    "dompurify": "^3.3.3",
+    "dompurify": "^3.4.17",
     "marked": "^15.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.19.0",
+    "@babel/core": "^7.29.7",
     "@babel/plugin-proposal-class-properties": "^7.16.0",
     "@babel/plugin-proposal-object-rest-spread": "^7.16.0",
     "@babel/plugin-syntax-dynamic-import": "^7.8.3",
     "@babel/plugin-transform-runtime": "^7.16.4",
-    "@babel/preset-env": "^7.19.0",
+    "@babel/preset-env": "^7.29.7",
     "@babel/preset-typescript": "^7.16.0",
     "@babel/runtime": "^7.16.3",
     "@rollup/plugin-babel": "^6.0.4",
@@ -57,7 +57,6 @@
     "@types/node": "^16.11.7",
     "@types/trusted-types": "^2.0.2",
     "babel-plugin-transform-scss": "^1.2.0",
-    "babel-preset-env": "^1.7.0",
     "chrome-remote-interface": "^0.34.0",
     "core-js": "3",
     "cross-env": "^7.0.3",
@@ -69,13 +68,13 @@
     "rollup-plugin-scss": "^4.0.1",
     "sass": "^1.89.1",
     "source-map": "^0.7.4",
-    "svelte": "^5.33.14",
+    "svelte": "^5.57.2",
     "svelte-check": "^4.2.1",
     "svelte-preprocess": "^6.0.3",
     "types-for-adobe": "^7.2.3",
     "types-for-adobe-extras": "^0.0.9",
     "typescript": "^5.8.3",
-    "vite": "^6.3.5",
+    "vite": "^6.4.5",
     "vite-cep-plugin": "^2.2.0"
   }
 }
